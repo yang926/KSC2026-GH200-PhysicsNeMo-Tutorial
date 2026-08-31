@@ -1,0 +1,327 @@
+# Copyright (c) 2024 NVIDIA Corporation. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# KISTI native ARM64 build path. Apptainer pulls both digest-pinned NGC
+# images directly; Docker, Podman, apt, and fakeroot are not used.
+
+Bootstrap: docker
+From: nvcr.io/nvidia/nvhpc:25.5-devel-cuda_multi-ubuntu24.04@sha256:d5b8001ed137d70417454279c46f6dde335337efbbd6742a4b1c103cbf85831b
+Stage: nvhpc
+
+Bootstrap: docker
+From: nvcr.io/nvidia/physicsnemo/physicsnemo:25.11@sha256:4e7f82e33d886828efd1e4d65236f5e44c96dfbd3d316c58723eff9b9298eda6
+Stage: final
+
+%arguments
+    BUILD_JOBS=12
+
+# Preserve the complete 25.5 compiler and NVPL installation. Copying from the
+# previous stage keeps symlinks in the SDK intact.
+%files from nvhpc
+    /opt/nvidia/hpc_sdk /opt/nvidia/hpc_sdk
+
+# Deliberate host-file allow-list. In particular, active site.env,
+# credentials, notebook outputs, and local datasets cannot enter the SIF
+# through a broad directory copy.
+%files
+    .dockerignore /opt/ksc2026/course-source/.dockerignore
+    course-release.json /opt/ksc2026/course-source/course-release.json
+    README.md /opt/ksc2026/course-source/README.md
+    LICENSE /opt/ksc2026/course-source/LICENSE
+    PROVENANCE.md /opt/ksc2026/course-source/PROVENANCE.md
+    Deployment_Guide.MD /opt/ksc2026/course-source/Deployment_Guide.MD
+    00_Start_Here.ipynb /opt/ksc2026/course-source/00_Start_Here.ipynb
+
+    01_GH200/README.md /opt/ksc2026/course-source/01_GH200/README.md
+    01_GH200/01_CPU_Compile_and_Tune.ipynb /opt/ksc2026/course-source/01_GH200/01_CPU_Compile_and_Tune.ipynb
+    01_GH200/02_GPU_Memory_Profile.ipynb /opt/ksc2026/course-source/01_GH200/02_GPU_Memory_Profile.ipynb
+
+    02_PhysicsNeMo/README.md /opt/ksc2026/course-source/02_PhysicsNeMo/README.md
+    02_PhysicsNeMo/01_Projectile_PINN.ipynb /opt/ksc2026/course-source/02_PhysicsNeMo/01_Projectile_PINN.ipynb
+    02_PhysicsNeMo/02_Poisson_FNO.ipynb /opt/ksc2026/course-source/02_PhysicsNeMo/02_Poisson_FNO.ipynb
+    02_PhysicsNeMo/optional/README.md /opt/ksc2026/course-source/02_PhysicsNeMo/optional/README.md
+    02_PhysicsNeMo/optional/FNO_Mode_Ablation.ipynb /opt/ksc2026/course-source/02_PhysicsNeMo/optional/FNO_Mode_Ablation.ipynb
+
+    assets/README.md /opt/ksc2026/course-source/assets/README.md
+    assets/upstream/challenge_plots/example_challenge_20251215_112914_all_metrics.png /opt/ksc2026/course-source/assets/upstream/challenge_plots/example_challenge_20251215_112914_all_metrics.png
+    assets/upstream/challenge_plots/l2_error_curve.png /opt/ksc2026/course-source/assets/upstream/challenge_plots/l2_error_curve.png
+    assets/upstream/challenge_plots/loss_curve.png /opt/ksc2026/course-source/assets/upstream/challenge_plots/loss_curve.png
+    assets/upstream/diffusion_1d/diffusion_bar_geometry.png /opt/ksc2026/course-source/assets/upstream/diffusion_1d/diffusion_bar_geometry.png
+    assets/upstream/diffusion_1d/image_diffusion_problem_bootcamp.png /opt/ksc2026/course-source/assets/upstream/diffusion_1d/image_diffusion_problem_bootcamp.png
+    assets/upstream/diffusion_1d/image_diffusion_problem_bootcamp_parameterized.png /opt/ksc2026/course-source/assets/upstream/diffusion_1d/image_diffusion_problem_bootcamp_parameterized.png
+    assets/upstream/diffusion_1d/paraview_1.png /opt/ksc2026/course-source/assets/upstream/diffusion_1d/paraview_1.png
+    assets/upstream/diffusion_1d/paraview_2.png /opt/ksc2026/course-source/assets/upstream/diffusion_1d/paraview_2.png
+    assets/upstream/diffusion_1d/paraview_3.png /opt/ksc2026/course-source/assets/upstream/diffusion_1d/paraview_3.png
+    assets/upstream/fluid/chip_2d.png /opt/ksc2026/course-source/assets/upstream/fluid/chip_2d.png
+    assets/upstream/introduction/every_parabola.png /opt/ksc2026/course-source/assets/upstream/introduction/every_parabola.png
+    assets/upstream/introduction/image_data_driven_cons.png /opt/ksc2026/course-source/assets/upstream/introduction/image_data_driven_cons.png
+    assets/upstream/introduction/inverse_parabola.png /opt/ksc2026/course-source/assets/upstream/introduction/inverse_parabola.png
+    assets/upstream/introduction/inverse_parabola_2.png /opt/ksc2026/course-source/assets/upstream/introduction/inverse_parabola_2.png
+    assets/upstream/introduction/physicsnemo.webp /opt/ksc2026/course-source/assets/upstream/introduction/physicsnemo.webp
+    assets/upstream/introduction/prediction.png /opt/ksc2026/course-source/assets/upstream/introduction/prediction.png
+    assets/upstream/introduction/projectile.svg /opt/ksc2026/course-source/assets/upstream/introduction/projectile.svg
+    assets/upstream/introduction/single_parabola.png /opt/ksc2026/course-source/assets/upstream/introduction/single_parabola.png
+    assets/upstream/introduction/tensorboard.png /opt/ksc2026/course-source/assets/upstream/introduction/tensorboard.png
+    assets/upstream/introduction/workflow.webp /opt/ksc2026/course-source/assets/upstream/introduction/workflow.webp
+    assets/upstream/misc/git_branching.jpg /opt/ksc2026/course-source/assets/upstream/misc/git_branching.jpg
+    assets/upstream/navier_stokes/paraview.webm /opt/ksc2026/course-source/assets/upstream/navier_stokes/paraview.webm
+    assets/upstream/navier_stokes/paraview_file.png /opt/ksc2026/course-source/assets/upstream/navier_stokes/paraview_file.png
+    assets/upstream/navier_stokes/periodicity.png /opt/ksc2026/course-source/assets/upstream/navier_stokes/periodicity.png
+    assets/upstream/navier_stokes/periodicity_conversion.png /opt/ksc2026/course-source/assets/upstream/navier_stokes/periodicity_conversion.png
+    assets/upstream/navier_stokes/projection.png /opt/ksc2026/course-source/assets/upstream/navier_stokes/projection.png
+    assets/upstream/navier_stokes/sample.png /opt/ksc2026/course-source/assets/upstream/navier_stokes/sample.png
+    assets/upstream/navier_stokes/u_plot.png /opt/ksc2026/course-source/assets/upstream/navier_stokes/u_plot.png
+    assets/upstream/references/CONTRIBUTING.md /opt/ksc2026/course-source/assets/upstream/references/CONTRIBUTING.md
+    assets/upstream/references/PhysicsNeMo-Industrial-Usecases.pdf /opt/ksc2026/course-source/assets/upstream/references/PhysicsNeMo-Industrial-Usecases.pdf
+
+    labs/README.md /opt/ksc2026/course-source/labs/README.md
+    labs/gh200/README.md /opt/ksc2026/course-source/labs/gh200/README.md
+    labs/gh200/notebook_utils.py /opt/ksc2026/course-source/labs/gh200/notebook_utils.py
+    labs/gh200/blas/Makefile /opt/ksc2026/course-source/labs/gh200/blas/Makefile
+    labs/gh200/blas/dgemm.c /opt/ksc2026/course-source/labs/gh200/blas/dgemm.c
+    labs/gh200/cuda_memory/explicit.cu /opt/ksc2026/course-source/labs/gh200/cuda_memory/explicit.cu
+    labs/gh200/cuda_memory/managed.cu /opt/ksc2026/course-source/labs/gh200/cuda_memory/managed.cu
+    labs/gh200/cuda_memory/hmm.cu /opt/ksc2026/course-source/labs/gh200/cuda_memory/hmm.cu
+    labs/projectile/source_code/conf/config.yaml /opt/ksc2026/course-source/labs/projectile/source_code/conf/config.yaml
+    labs/projectile/source_code/projectile.py /opt/ksc2026/course-source/labs/projectile/source_code/projectile.py
+    labs/projectile/source_code/projectile_eqn.py /opt/ksc2026/course-source/labs/projectile/source_code/projectile_eqn.py
+    labs/projectile/images/modulus.webp /opt/ksc2026/course-source/labs/projectile/images/modulus.webp
+    labs/projectile/images/paraview.png /opt/ksc2026/course-source/labs/projectile/images/paraview.png
+    labs/projectile/images/paraview_display.png /opt/ksc2026/course-source/labs/projectile/images/paraview_display.png
+    labs/projectile/images/paraview_download.png /opt/ksc2026/course-source/labs/projectile/images/paraview_download.png
+    labs/projectile/images/paraview_open.png /opt/ksc2026/course-source/labs/projectile/images/paraview_open.png
+    labs/projectile/images/physicsnemo_sym_workflow.webp /opt/ksc2026/course-source/labs/projectile/images/physicsnemo_sym_workflow.webp
+    labs/projectile/images/prediction.png /opt/ksc2026/course-source/labs/projectile/images/prediction.png
+    labs/projectile/images/projectile.svg /opt/ksc2026/course-source/labs/projectile/images/projectile.svg
+    labs/projectile/images/tensorboard.png /opt/ksc2026/course-source/labs/projectile/images/tensorboard.png
+    labs/projectile/images/tensorboard_browser.png /opt/ksc2026/course-source/labs/projectile/images/tensorboard_browser.png
+    labs/projectile/images/vtk_download.png /opt/ksc2026/course-source/labs/projectile/images/vtk_download.png
+    labs/poisson_fno/conf/config_FNO.yaml /opt/ksc2026/course-source/labs/poisson_fno/conf/config_FNO.yaml
+    labs/poisson_fno/conf/config_FNO_ablation_6.yaml /opt/ksc2026/course-source/labs/poisson_fno/conf/config_FNO_ablation_6.yaml
+    labs/poisson_fno/conf/config_FNO_ablation_12.yaml /opt/ksc2026/course-source/labs/poisson_fno/conf/config_FNO_ablation_12.yaml
+    labs/poisson_fno/conf/config_FNO_recovery.yaml /opt/ksc2026/course-source/labs/poisson_fno/conf/config_FNO_recovery.yaml
+    labs/poisson_fno/data_validation.py /opt/ksc2026/course-source/labs/poisson_fno/data_validation.py
+    labs/poisson_fno/generate_data.py /opt/ksc2026/course-source/labs/poisson_fno/generate_data.py
+    labs/poisson_fno/notebook_utils.py /opt/ksc2026/course-source/labs/poisson_fno/notebook_utils.py
+    labs/poisson_fno/train_fno.py /opt/ksc2026/course-source/labs/poisson_fno/train_fno.py
+    labs/poisson_fno/images/fno_data_flow.svg /opt/ksc2026/course-source/labs/poisson_fno/images/fno_data_flow.svg
+
+    operations/.gitignore /opt/ksc2026/course-source/operations/.gitignore
+    operations/README.md /opt/ksc2026/course-source/operations/README.md
+    operations/participant/ksc2026 /opt/ksc2026/course-source/operations/participant/ksc2026
+    operations/participant/start-jupyter /opt/ksc2026/course-source/operations/participant/start-jupyter
+    operations/participant/session-controller.py /opt/ksc2026/course-source/operations/participant/session-controller.py
+    operations/participant/jupyter-job.sh /opt/ksc2026/course-source/operations/participant/jupyter-job.sh
+    operations/participant/site.env.example /opt/ksc2026/course-source/operations/participant/site.env.example
+    operations/admin/publish-course.sh /opt/ksc2026/course-source/operations/admin/publish-course.sh
+    operations/admin/participant/install-participants.sh /opt/ksc2026/course-source/operations/admin/participant/install-participants.sh
+
+    Dockerfile /opt/ksc2026/course-source/Dockerfile
+    Singularity /opt/ksc2026/course-source/Singularity
+    container/Apptainer.kisti.def /opt/ksc2026/course-source/container/Apptainer.kisti.def
+    container/README.md /opt/ksc2026/course-source/container/README.md
+    container/build_image.sh /opt/ksc2026/course-source/container/build_image.sh
+    container/build_sif.sh /opt/ksc2026/course-source/container/build_sif.sh
+    container/build_kisti_sif.sh /opt/ksc2026/course-source/container/build_kisti_sif.sh
+    container/entrypoint.sh /opt/ksc2026/course-source/container/entrypoint.sh
+    container/smoke_test.sh /opt/ksc2026/course-source/container/smoke_test.sh
+    container/ksc2026-image.json /opt/ksc2026/course-source/container/ksc2026-image.json
+    container/third-party-sources.json /opt/ksc2026/course-source/container/third-party-sources.json
+    tools/validate_course.py /opt/ksc2026/course-source/tools/validate_course.py
+
+    container/ksc2026-image.json /etc/ksc2026-image.json
+    container/third-party-sources.json /opt/ksc2026/third-party-sources.json
+    container/entrypoint.sh /opt/ksc2026/container/entrypoint.sh
+    container/smoke_test.sh /opt/ksc2026/container/smoke_test.sh
+
+%post
+    set -eu
+
+    test "$(dpkg --print-architecture)" = "arm64"
+    build_jobs="{{ BUILD_JOBS }}"
+    case "${build_jobs}" in
+        ''|*[!0-9]*) echo "BUILD_JOBS must be an integer" >&2; exit 1 ;;
+    esac
+    if [ "${build_jobs}" -lt 1 ] || [ "${build_jobs}" -gt 12 ]; then
+        echo "BUILD_JOBS must be between 1 and 12" >&2
+        exit 1
+    fi
+
+    # The digest-pinned PhysicsNeMo base already provides the ARM64 build
+    # toolchain. Fail before downloading sources if that contract changes.
+    for required_command in \
+        ar awk cmake curl find g++ gcc grep gzip install make readelf \
+        sha256sum sort tar xargs nvcc; do
+        command -v "${required_command}" >/dev/null 2>&1 || {
+            echo "Required base-image tool is missing: ${required_command}" >&2
+            exit 1
+        }
+    done
+    cmake --version | awk '
+        NR == 1 {
+            split($3, version, ".")
+            if (version[1] > 3 || (version[1] == 3 && version[2] >= 20)) exit 0
+            exit 1
+        }
+    '
+
+    # nvbandwidth v0.8 requires Boost.ProgramOptions. Build only that library
+    # and link it statically so no Boost runtime package is needed.
+    mkdir -p /tmp/boost /tmp/boost-install
+    curl --fail --location --retry 3 \
+        https://archives.boost.io/release/1.83.0/source/boost_1_83_0.tar.gz \
+        --output /tmp/boost_1_83_0.tar.gz
+    echo "c0685b68dd44cc46574cce86c4e17c0f611b15e195be9848dfd0769a0a207628  /tmp/boost_1_83_0.tar.gz" \
+        | sha256sum --check --strict -
+    tar --extract --gzip --file /tmp/boost_1_83_0.tar.gz \
+        --directory /tmp/boost --strip-components=1
+    (
+        cd /tmp/boost
+        ./bootstrap.sh \
+            --with-toolset=gcc \
+            --with-libraries=program_options \
+            --prefix=/tmp/boost-install
+        ./b2 -j"${build_jobs}" \
+            --with-program_options \
+            toolset=gcc \
+            variant=release \
+            link=static \
+            runtime-link=shared \
+            threading=multi \
+            cxxstd=17 \
+            cxxflags=-fPIC \
+            --layout=system \
+            --prefix=/tmp/boost-install \
+            install
+    )
+    test -s /tmp/boost-install/lib/libboost_program_options.a
+    install -D -m 0644 /tmp/boost/LICENSE_1_0.txt \
+        /opt/ksc2026/licenses/Boost-LICENSE_1_0.txt
+
+    mkdir -p /tmp/openblas /opt/ksc2026/vendor/openblas
+    curl --fail --location --retry 3 \
+        https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.31/OpenBLAS-0.3.31.tar.gz \
+        --output /tmp/openblas.tar.gz
+    echo "6dd2a63ac9d32643b7cc636eab57bf4e57d0ed1fff926dfbc5d3d97f2d2be3a6  /tmp/openblas.tar.gz" \
+        | sha256sum --check --strict -
+    tar --extract --gzip --file /tmp/openblas.tar.gz \
+        --directory /tmp/openblas --strip-components=1
+    make -C /tmp/openblas -j"${build_jobs}" \
+        DYNAMIC_ARCH=1 NOFORTRAN=1 USE_OPENMP=0
+    make -C /tmp/openblas \
+        DYNAMIC_ARCH=1 NOFORTRAN=1 USE_OPENMP=0 \
+        PREFIX=/opt/ksc2026/vendor/openblas install
+    install -D -m 0644 /tmp/openblas/LICENSE \
+        /opt/ksc2026/licenses/OpenBLAS-LICENSE
+    rm -rf /tmp/openblas /tmp/openblas.tar.gz
+
+    mkdir -p /tmp/nvbandwidth /opt/ksc2026/bin
+    curl --fail --location --retry 3 \
+        https://github.com/NVIDIA/nvbandwidth/archive/refs/tags/v0.8.tar.gz \
+        --output /tmp/nvbandwidth.tar.gz
+    echo "b3622945eb7fce2b4e1aea7d13de04f415f4d998db602893201a904320cf2d39  /tmp/nvbandwidth.tar.gz" \
+        | sha256sum --check --strict -
+    tar --extract --gzip --file /tmp/nvbandwidth.tar.gz \
+        --directory /tmp/nvbandwidth --strip-components=1
+    cuda_stub="$(find -L /usr/local/cuda -path '*/stubs/libcuda.so' -print -quit)"
+    test -n "${cuda_stub}"
+    cuda_stub_dir="$(dirname "${cuda_stub}")"
+    test -f "${cuda_stub_dir}/libnvidia-ml.so"
+    cmake -S /tmp/nvbandwidth -B /tmp/nvbandwidth/build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_CUDA_ARCHITECTURES=90 \
+        -DMULTINODE=OFF \
+        -DBOOST_ROOT=/tmp/boost-install \
+        -DBoost_ROOT=/tmp/boost-install \
+        -DBOOST_LIBRARYDIR=/tmp/boost-install/lib \
+        -DBoost_NO_SYSTEM_PATHS=ON \
+        -DBoost_NO_BOOST_CMAKE=ON \
+        -DBoost_USE_STATIC_LIBS=ON \
+        -DBoost_USE_STATIC_RUNTIME=OFF \
+        -DCMAKE_PREFIX_PATH=/tmp/boost-install \
+        -DCMAKE_EXE_LINKER_FLAGS="-L${cuda_stub_dir}"
+    cmake --build /tmp/nvbandwidth/build --parallel "${build_jobs}"
+    test -f /tmp/nvbandwidth/build/CMakeFiles/nvbandwidth.dir/link.txt
+    grep --fixed-strings --quiet \
+        /tmp/boost-install/lib/libboost_program_options.a \
+        /tmp/nvbandwidth/build/CMakeFiles/nvbandwidth.dir/link.txt
+    install -D -m 0755 /tmp/nvbandwidth/build/nvbandwidth \
+        /opt/ksc2026/bin/nvbandwidth
+    install -D -m 0644 /tmp/nvbandwidth/LICENSE \
+        /opt/ksc2026/licenses/nvbandwidth-LICENSE
+    install -D -m 0644 /tmp/nvbandwidth/Licenses.txt \
+        /opt/ksc2026/licenses/nvbandwidth-Licenses.txt
+    if readelf -d /opt/ksc2026/bin/nvbandwidth \
+        | grep -Eiq 'NEEDED.*libboost_program_options|RPATH.*\/tmp|RUNPATH.*\/tmp'; then
+        echo "nvbandwidth has an unexpected dynamic Boost dependency or build-path RPATH" >&2
+        exit 1
+    fi
+    rm -rf \
+        /tmp/boost /tmp/boost-install /tmp/boost_1_83_0.tar.gz \
+        /tmp/nvbandwidth /tmp/nvbandwidth.tar.gz
+
+    chmod 0755 \
+        /opt/ksc2026/container/entrypoint.sh \
+        /opt/ksc2026/container/smoke_test.sh \
+        /opt/ksc2026/course-source/container/build_image.sh \
+        /opt/ksc2026/course-source/container/build_sif.sh \
+        /opt/ksc2026/course-source/container/build_kisti_sif.sh \
+        /opt/ksc2026/course-source/container/entrypoint.sh \
+        /opt/ksc2026/course-source/container/smoke_test.sh \
+        /opt/ksc2026/course-source/operations/participant/ksc2026 \
+        /opt/ksc2026/course-source/operations/participant/start-jupyter \
+        /opt/ksc2026/course-source/operations/participant/session-controller.py \
+        /opt/ksc2026/course-source/operations/participant/jupyter-job.sh \
+        /opt/ksc2026/course-source/operations/admin/publish-course.sh \
+        /opt/ksc2026/course-source/operations/admin/participant/install-participants.sh
+
+    test -x /opt/nvidia/hpc_sdk/Linux_aarch64/25.5/compilers/bin/nvc
+    test -d /opt/nvidia/hpc_sdk/Linux_aarch64/25.5/math_libs/nvpl/include
+    test -d /opt/nvidia/hpc_sdk/Linux_aarch64/25.5/math_libs/nvpl/lib
+    command -v gcc >/dev/null
+    command -v nvcc >/dev/null
+    command -v nsys >/dev/null
+    command -v jupyter-lab >/dev/null
+    command -v /opt/ksc2026/bin/nvbandwidth >/dev/null
+    /opt/nvidia/physicsnemo_env.sh python3 -c 'import physicsnemo, physicsnemo.sym, torch'
+    find /opt/ksc2026/course-source -type f -print0 \
+        | sort -z \
+        | xargs -0 sha256sum \
+        > /opt/ksc2026/course-manifest.sha256
+
+%environment
+    export KSC_SOURCE_DIR=/opt/ksc2026/course-source
+    export KSC_IMAGE_MANIFEST=/etc/ksc2026-image.json
+    export NVHPC_ROOT=/opt/nvidia/hpc_sdk/Linux_aarch64/25.5
+    export NVPL_ROOT=/opt/nvidia/hpc_sdk/Linux_aarch64/25.5/math_libs/nvpl
+    export OPENBLAS_ROOT=/opt/ksc2026/vendor/openblas
+    export PATH=/opt/ksc2026/bin:/usr/local/cuda/bin:/opt/nvidia/hpc_sdk/Linux_aarch64/25.5/compilers/bin:${PATH}
+    export CPATH=/opt/nvidia/hpc_sdk/Linux_aarch64/25.5/math_libs/nvpl/include:${CPATH:-}
+    export LIBRARY_PATH=/opt/nvidia/hpc_sdk/Linux_aarch64/25.5/math_libs/nvpl/lib:/opt/nvidia/hpc_sdk/Linux_aarch64/25.5/compilers/lib:${LIBRARY_PATH:-}
+    export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}:/opt/nvidia/hpc_sdk/Linux_aarch64/25.5/math_libs/nvpl/lib:/opt/nvidia/hpc_sdk/Linux_aarch64/25.5/compilers/lib:/opt/ksc2026/vendor/openblas/lib
+    export PIP_NO_INDEX=1
+    export PIP_DISABLE_PIP_VERSION_CHECK=1
+    export HF_HUB_OFFLINE=1
+    export TRANSFORMERS_OFFLINE=1
+    export PYTHONDONTWRITEBYTECODE=1
+    export PYTHONUNBUFFERED=1
+
+%labels
+    org.opencontainers.image.title KSC 2026 GH200 + PhysicsNeMo course
+    org.opencontainers.image.description Offline ARM64 course image built directly with Apptainer on KISTI
+    org.opencontainers.image.version 25.11-arm64
+    org.opencontainers.image.source https://github.com/yang926/KSC2026-GH200-PhysicsNeMo-Tutorial
+    kr.repro.ksc2026.runtime-compatibility ksc2026-gh200-physicsnemo-25.11-arm64-v1
+    kr.repro.ksc2026.physicsnemo.version 25.11
+    kr.repro.ksc2026.nvhpc.version 25.5
+    kr.repro.ksc2026.nvpl.version 25.5
+    kr.repro.ksc2026.boost-program-options.version 1.83.0-static
+    kr.repro.ksc2026.openblas.version 0.3.31
+    kr.repro.ksc2026.nvbandwidth.version 0.8
+    kr.repro.ksc2026.runtime-network-required false
+
+%runscript
+    exec /opt/nvidia/physicsnemo_env.sh /opt/ksc2026/container/entrypoint.sh "$@"
+
+%test
+    /opt/nvidia/physicsnemo_env.sh /opt/ksc2026/container/smoke_test.sh --static

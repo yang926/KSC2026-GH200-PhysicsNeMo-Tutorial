@@ -1,0 +1,80 @@
+# SPDX-FileCopyrightText: Copyright (c) 2023 - 2024 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-FileCopyrightText: All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# KSC 2026 Level 1: Fourier Neural Operator (FNO)
+# Canonical problem: -Delta u = f on [0,1)^2 with periodic BC.
+#
+# This is the GH200 showcase *candidate*, not a completed benchmark.  Time and
+# memory usage must be measured on the actual KISTI PILOT GH200 before class.
+
+defaults :
+  - physicsnemo_default
+  - /arch/conv_fully_connected_cfg@arch.decoder
+  - /arch/fno_cfg@arch.fno
+  - scheduler: tf_exponential_lr
+  - optimizer: adam
+  - loss: sum
+  - _self_
+
+# Keep checkpoints, validators, logs, and final metrics isolated by profile.
+network_dir: outputs/ksc_fno_gh200
+
+arch:
+  decoder:
+    # The z width controls the latent FNO channel width.
+    input_keys: [z, 64]
+    output_keys: u
+    nr_layers: 1
+    layer_size: 64
+
+  fno:
+    input_keys: f
+    dimension: 2
+    nr_fno_layers: 6
+    fno_modes: 32
+    # The operator and data are periodic, so no boundary padding or absolute
+    # coordinate channels are needed.
+    padding: 0
+    coord_features: false
+
+scheduler:
+  decay_rate: 0.95
+  decay_steps: 250
+
+training:
+  rec_results_freq: 250
+  rec_validation_freq: 250
+  save_network_freq: 500
+  print_stats_freq: 25
+  max_steps: 2000
+
+batch_size:
+  grid: 8
+  validation: 8
+  test: 8
+
+custom:
+  profile: gh200
+  experiment_label: gh200_main
+  random_seed: 2026
+  train_file: datasets/Poisson_Fourier_GH200/train.hdf5
+  validation_file: datasets/Poisson_Fourier_GH200/val.hdf5
+  test_file: datasets/Poisson_Fourier_GH200/test.hdf5
+  metrics_file: outputs/ksc_fno_gh200/final_state_test_metrics.json
+  candidate_note: >-
+    256x256, 2048/256/256 samples, width 64, 6 FNO layers, 32 modes,
+    batch 8, and 2000 steps are KSC GH200 benchmark candidates until timed
+    and memory-checked on the actual KISTI PILOT system.

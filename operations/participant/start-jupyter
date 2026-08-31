@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Central KSC 2026 entry point called by /scratch/hackathon/ksc2026/bin/ksc2026.
+
+set -euo pipefail
+umask 077
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+controller="${script_dir}/session-controller.py"
+python_module=cray-python/3.11.7
+
+die() {
+    printf 'KSC2026 오류: %s\n' "$1" >&2
+    exit 1
+}
+
+usage() {
+    cat >&2 <<'EOF'
+사용법:
+  ksc2026              Jupyter를 시작하거나 기존 세션에 재접속
+  ksc2026 --refresh    새로 게시된 강의자료를 별도 작업공간에 준비
+  ksc2026 --stop       현재 계정의 세션만 명시적으로 종료
+
+SSH나 브라우저 연결이 끊겨도 Slurm Job과 저장 파일은 유지됩니다.
+PILOT에 다시 로그인해 ksc2026을 실행하면 기존 Job의 새 터널 명령과 주소를 다시 보여 줍니다.
+EOF
+    exit 2
+}
+
+[[ -f "$controller" && ! -L "$controller" ]] || die "세션 제어기를 찾을 수 없습니다: $controller"
+
+# 사용법 확인과 잘못된 옵션 처리는 서버 모듈을 불러오기 전에 끝낸다.
+# 참가자에게 공개하는 명령은 아래 세 가지뿐이다.
+case "${1:-}" in
+    '') (( $# == 0 )) || usage; command_name=start ;;
+    --refresh) (( $# == 1 )) || usage; command_name=refresh ;;
+    --stop) (( $# == 1 )) || usage; command_name=stop ;;
+    -h|--help) usage ;;
+    *) usage ;;
+esac
+
+if ! type module >/dev/null 2>&1; then
+    for init_script in /etc/profile.d/modules.sh /usr/share/Modules/init/bash /etc/profile; do
+        if [[ -r "$init_script" ]]; then
+            # shellcheck disable=SC1090
+            source "$init_script"
+            type module >/dev/null 2>&1 && break
+        fi
+    done
+fi
+type module >/dev/null 2>&1 || die 'PILOT 로그인 노드에서 Environment Modules를 찾을 수 없습니다.'
+module load "$python_module"
+python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)' || \
+    die "$python_module 로드 뒤 Python 3.9 이상이 필요합니다."
+
+exec /usr/bin/env \
+    -u BASH_ENV -u ENV -u PYTHONPATH -u PYTHONHOME -u LD_PRELOAD -u LD_LIBRARY_PATH \
+    -u APPTAINERENV_PREPEND_PATH -u APPTAINERENV_APPEND_PATH -u APPTAINER_BIND \
+    python3 -B "$controller" "$command_name"

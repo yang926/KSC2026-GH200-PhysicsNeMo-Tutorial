@@ -1,0 +1,7 @@
+# Site-specific inputs are generated privately by the KISTI operator.
+site.env
+roster-source.csv
+*.private.tsv
+*.private.csv
+*.actual.tsv
+*.actual.env

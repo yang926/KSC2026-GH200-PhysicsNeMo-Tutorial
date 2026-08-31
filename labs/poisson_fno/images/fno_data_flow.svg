@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="500" viewBox="0 0 1480 500" role="img" aria-labelledby="title desc">
+  <title id="title">FNO가 소스항 f에서 해 u를 예측하는 과정</title>
+  <desc id="desc">소스항 f의 격자를 여러 특징 채널로 바꾸고, Fourier 변환 블록을 반복해 처리한 뒤 해 u를 예측하는 과정.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#334155"/>
+    </marker>
+    <style>
+      .title{font:700 30px Arial,sans-serif;fill:#111827}.sub{font:18px Arial,sans-serif;fill:#475569}
+      .label{font:700 20px Arial,sans-serif;fill:#111827}.small{font:16px Arial,sans-serif;fill:#334155}
+      .box{stroke:#334155;stroke-width:2.5}.wire{stroke:#334155;stroke-width:3;fill:none}.arrow{stroke:#334155;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1480" height="500" rx="24" fill="#f8fafc"/>
+  <text x="740" y="48" text-anchor="middle" class="title">Fourier Neural Operator: 소스항 f(x,y)에서 해 u(x,y) 예측하기</text>
+  <text x="740" y="78" text-anchor="middle" class="sub">소스항 f(x,y)의 전체 격자를 받아 그에 대응하는 해 u_pred(x,y)를 예측합니다.</text>
+
+  <rect x="38" y="184" width="180" height="106" rx="18" fill="#d9f99d" class="box"/>
+  <text x="128" y="224" text-anchor="middle" class="label">소스항</text>
+  <text x="128" y="258" text-anchor="middle" class="small">f(x,y) 격자</text>
+
+  <line x1="218" y1="237" x2="282" y2="237" class="arrow"/>
+  <rect x="286" y="184" width="150" height="106" rx="18" fill="#bfdbfe" class="box"/>
+  <text x="361" y="218" text-anchor="middle" class="label">특징 채널</text>
+  <text x="361" y="248" text-anchor="middle" class="label">변환</text>
+  <text x="361" y="274" text-anchor="middle" class="small">lifting</text>
+
+  <line x1="436" y1="237" x2="514" y2="237" class="wire"/>
+  <circle cx="514" cy="237" r="5" fill="#334155"/>
+  <rect x="496" y="112" width="570" height="250" rx="24" fill="#ffffff" stroke="#76b900" stroke-width="4"/>
+  <text x="781" y="145" text-anchor="middle" class="label">Fourier 변환 블록 × L회 반복</text>
+
+  <path d="M514 237 V206 H524" class="arrow"/>
+  <path d="M514 237 V293 H594" class="arrow"/>
+
+  <rect x="530" y="174" width="92" height="64" rx="14" fill="#e2e8f0" class="box"/>
+  <text x="576" y="214" text-anchor="middle" class="label">FFT</text>
+  <line x1="622" y1="206" x2="654" y2="206" class="arrow"/>
+  <rect x="658" y="166" width="150" height="80" rx="14" fill="#fef3c7" class="box"/>
+  <text x="733" y="198" text-anchor="middle" class="small">선택한 Fourier</text>
+  <text x="733" y="224" text-anchor="middle" class="small">모드만 유지</text>
+  <line x1="808" y1="206" x2="840" y2="206" class="arrow"/>
+  <rect x="844" y="166" width="150" height="80" rx="14" fill="#fde68a" class="box"/>
+  <text x="919" y="198" text-anchor="middle" class="small">주파수 가중치 학습</text>
+  <text x="919" y="224" text-anchor="middle" class="small">+ 역 FFT</text>
+
+  <rect x="600" y="260" width="190" height="66" rx="14" fill="#dbeafe" class="box"/>
+  <text x="695" y="300" text-anchor="middle" class="small">공간 영역 선형 경로</text>
+  <path d="M994 206 H1032 V246 H890 V260" class="arrow"/>
+  <line x1="790" y1="292" x2="858" y2="292" class="arrow"/>
+  <circle cx="890" cy="292" r="28" fill="#dcfce7" class="box"/>
+  <text x="890" y="300" text-anchor="middle" class="label">+</text>
+  <line x1="918" y1="292" x2="944" y2="292" class="arrow"/>
+  <rect x="948" y="260" width="92" height="64" rx="14" fill="#dcfce7" class="box"/>
+  <text x="994" y="299" text-anchor="middle" class="small">활성화</text>
+  <path d="M1040 292 H1054 V237 H1066" stroke="#334155" stroke-width="3" fill="none"/>
+
+  <line x1="1066" y1="237" x2="1122" y2="237" class="arrow"/>
+  <rect x="1126" y="184" width="135" height="106" rx="18" fill="#bfdbfe" class="box"/>
+  <text x="1194" y="218" text-anchor="middle" class="label">출력</text>
+  <text x="1194" y="248" text-anchor="middle" class="label">변환</text>
+  <text x="1194" y="274" text-anchor="middle" class="small">decoder</text>
+
+  <line x1="1261" y1="237" x2="1317" y2="237" class="arrow"/>
+  <rect x="1321" y="184" width="128" height="106" rx="18" fill="#bbf7d0" class="box"/>
+  <text x="1385" y="224" text-anchor="middle" class="label">예측 해</text>
+  <text x="1385" y="258" text-anchor="middle" class="small">u_pred(x,y)</text>
+
+  <text x="740" y="420" text-anchor="middle" class="sub">모델의 fno_modes는 각 공간축에서 사용할 Fourier 모드 수를 정합니다.</text>
+  <text x="740" y="451" text-anchor="middle" class="sub">정답 데이터에 포함할 최대 주파수를 정하는 데이터 생성기의 max_mode와는 다른 값입니다.</text>
+</svg>

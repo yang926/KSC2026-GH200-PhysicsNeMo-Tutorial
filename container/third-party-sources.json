@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "name": "NVIDIA PhysicsNeMo container",
+      "version": "25.11",
+      "source": "nvcr.io/nvidia/physicsnemo/physicsnemo:25.11",
+      "linux_arm64_manifest_digest": "sha256:4e7f82e33d886828efd1e4d65236f5e44c96dfbd3d316c58723eff9b9298eda6",
+      "notice": "Use and redistribution remain subject to the NVIDIA NGC container terms. Confirm the event distribution path before publishing the SIF."
+    },
+    {
+      "name": "NVIDIA HPC SDK and NVPL",
+      "version": "25.5",
+      "source": "nvcr.io/nvidia/nvhpc:25.5-devel-cuda_multi-ubuntu24.04",
+      "linux_arm64_manifest_digest": "sha256:d5b8001ed137d70417454279c46f6dde335337efbbd6742a4b1c103cbf85831b",
+      "notice": "Use and redistribution remain subject to the NVIDIA HPC SDK and NGC terms. Confirm the event distribution path before publishing the SIF."
+    },
+    {
+      "name": "Boost.ProgramOptions",
+      "version": "1.83.0",
+      "source": "https://archives.boost.io/release/1.83.0/source/boost_1_83_0.tar.gz",
+      "sha256": "c0685b68dd44cc46574cce86c4e17c0f611b15e195be9848dfd0769a0a207628",
+      "license": "BSL-1.0",
+      "linkage": "Static library linked into nvbandwidth; Boost is not required as a runtime shared library.",
+      "license_in_image": "/opt/ksc2026/licenses/Boost-LICENSE_1_0.txt"
+    },
+    {
+      "name": "OpenBLAS",
+      "version": "0.3.31",
+      "source": "https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.31/OpenBLAS-0.3.31.tar.gz",
+      "sha256": "6dd2a63ac9d32643b7cc636eab57bf4e57d0ed1fff926dfbc5d3d97f2d2be3a6",
+      "license": "BSD-3-Clause",
+      "license_in_image": "/opt/ksc2026/licenses/OpenBLAS-LICENSE"
+    },
+    {
+      "name": "nvbandwidth",
+      "version": "0.8",
+      "source": "https://github.com/NVIDIA/nvbandwidth/archive/refs/tags/v0.8.tar.gz",
+      "sha256": "b3622945eb7fce2b4e1aea7d13de04f415f4d998db602893201a904320cf2d39",
+      "license": "Apache-2.0",
+      "license_in_image": "/opt/ksc2026/licenses/nvbandwidth-LICENSE",
+      "bundled_notices_in_image": "/opt/ksc2026/licenses/nvbandwidth-Licenses.txt"
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+import physicsnemo
+import physicsnemo.sym
+import numpy as np
+from sympy import Symbol
+
+from physicsnemo.sym.hydra import instantiate_arch, PhysicsNeMoConfig
+from physicsnemo.sym.solver import Solver
+from physicsnemo.sym.domain import Domain
+from physicsnemo.sym.geometry.primitives_1d import Point1D
+from physicsnemo.sym.domain.constraint import PointwiseBoundaryConstraint
+from physicsnemo.sym.domain.inferencer import PointwiseInferencer
+from physicsnemo.sym.domain.validator import PointwiseValidator
+from physicsnemo.sym.key import Key
+from projectile_eqn import ProjectileEquation
+from physicsnemo.sym.utils.io import (
+    InferencerPlotter,
+    ValidatorPlotter,
+)
+
+
+@physicsnemo.sym.main(config_path="conf", config_name="config")
+def run(cfg: PhysicsNeMoConfig) -> None:
+    """Train the KSC projectile PINN and write validation artifacts."""
+
+    gravity = 9.81
+    initial_speed = 40.0
+    launch_angle = np.pi / 3
+    time = Symbol("t")
+
+    # Equation node + neural-network node form one computational graph.
+    pe = ProjectileEquation(gravity=gravity)
+    projectile_net = instantiate_arch(
+        input_keys=[Key("t")],
+        output_keys=[Key("x"), Key("y")],
+        cfg=cfg.arch.fully_connected,
+    )
+    nodes = pe.make_nodes() + [projectile_net.make_node(name="projectile_network")]
+
+    # Point1D is a sampling anchor. Time is supplied through parameterization;
+    # it is not a geometric representation of the projectile trajectory.
+    geo = Point1D(0)
+    projectile_domain = Domain()
+
+    time_range = {time: (0.0, 5.0)}
+    velocity_x = initial_speed * np.cos(launch_angle)
+    velocity_y = initial_speed * np.sin(launch_angle)
+
+    # Four initial conditions are required for two second-order ODEs.
+    initial_condition = PointwiseBoundaryConstraint(
+        nodes=nodes,
+        geometry=geo,
+        outvar={
+            "x": 0.0,
+            "y": 0.0,
+            "x__t": velocity_x,
+            "y__t": velocity_y,
+        },
+        batch_size=cfg.batch_size.initial_x,
+        parameterization={time: 0.0},
+    )
+    projectile_domain.add_constraint(initial_condition, "initial_condition")
+
+    # The equation class already expresses y'' + g = 0, so both residual
+    # targets are zero. The constraint samples t through parameterization.
+    ode_constraint = PointwiseBoundaryConstraint(
+        nodes=nodes,
+        geometry=geo,
+        outvar={"ode_x": 0.0, "ode_y": 0.0},
+        batch_size=cfg.batch_size.interior,
+        parameterization=time_range,
+    )
+    projectile_domain.add_constraint(ode_constraint, "ode_constraint")
+
+
+    # Setup validator
+    time_validation = np.arange(0.0, 5.0, 0.01)[:, None]
+    x_validation = velocity_x * time_validation
+    y_validation = (
+        velocity_y * time_validation
+        - 0.5 * gravity * time_validation**2
+    )
+
+    validator = PointwiseValidator(
+        nodes=nodes,
+        invar={"t": time_validation},
+        true_outvar={"x": x_validation, "y": y_validation},
+        batch_size=128,
+        plotter=ValidatorPlotter(),
+    )
+    projectile_domain.add_validator(validator)
+
+    # 5-8 s is extrapolation. After ground impact (~7.06 s), this ODE omits
+    # collision physics and continues the mathematical trajectory below y=0.
+    time_inference = np.arange(0.0, 8.0, 0.001)[:, None]
+    grid_inference = PointwiseInferencer(
+        nodes=nodes,
+        invar={"t": time_inference},
+        output_names=["x", "y"],
+        batch_size=128,
+        plotter=InferencerPlotter(),
+    )
+    projectile_domain.add_inferencer(grid_inference, "inferencer_data")
+
+    solver = Solver(cfg, projectile_domain)
+    solver.solve()
+
+
+if __name__ == "__main__":
+    run()
