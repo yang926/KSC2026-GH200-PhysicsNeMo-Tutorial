@@ -45,7 +45,10 @@ for marker in \
     'CENTRAL_ENTRYPOINT_IMMUTABLE_CONTENT_MISMATCH' \
     '/scratch/hackathon/ksc2026/bin/ksc2026' \
     'SITE_ENV_COURSE_RELEASE_WOULD_ROLL_BACK' \
-    'ADMIN_TOOLS_ONLY_RUNTIME_MISMATCH' \
+    'KSC_RUNTIME_CHECK=SKIPPED' \
+    'KSC_SIF_CHECK=SKIPPED' \
+    'KSC_SLURM_CHECK=SKIPPED' \
+    'if (( apply == 1 && admin_tools_only == 0 && runtime_changes > 0 )); then' \
     '(( admin_tools_only == 1 && index < 4 )) && continue' \
     '"$central_root/admin/libexec/validate_course.py"' \
     '"$central_root/admin/libexec/validate_participant_release.py"' \
@@ -142,6 +145,7 @@ for expected in \
     'Default: dry-run' \
     '--apply' \
     '--admin-tools-only' \
+    'returns before inspecting the SIF or shared Jupyter' \
     '/scratch/hackathon/ksc2026/bin/ksc2026' \
     'never writes inside /scratch/<user>' \
     'runs --apply without sudo'; do
@@ -150,6 +154,14 @@ for expected in \
         exit 1
     }
 done
+
+admin_tools_exit_line="$(grep -nF 'KSC_INSTALL_SCOPE=ADMIN_TOOLS_ONLY' "$installer" | head -1 | cut -d: -f1)"
+sif_check_line="$(grep -nF 'VERIFYING_SIF_SHA256=' "$installer" | head -1 | cut -d: -f1)"
+[[ "$admin_tools_exit_line" =~ ^[0-9]+$ && "$sif_check_line" =~ ^[0-9]+$ && \
+   "$admin_tools_exit_line" -lt "$sif_check_line" ]] || {
+    printf 'Admin-tools-only path does not finish before the SIF/runtime path.\n' >&2
+    exit 1
+}
 
 publisher_help_output="$(bash "$publisher" --help)"
 [[ "$publisher_help_output" == *'--migrate-from-commit'* ]] || {

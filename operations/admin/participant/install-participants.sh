@@ -18,8 +18,8 @@ Usage:
 
 Default: dry-run. Add --apply only after every planned action is reviewed.
 Use --admin-tools-only to install only the trusted course publisher, validators,
-and refresh command. That mode fails closed if the shared Jupyter runtime does
-not already match this source; it never updates runtime files.
+and refresh command. It returns before inspecting the SIF or shared Jupyter
+runtime and never queries or changes Slurm jobs or participant workspaces.
 If /scratch/hackathon/ksc2026 is absent, the selected central owner creates it
 as mode 0755 and then runs --apply without sudo. If that fixed child path is a
 symlink or another file type, or is owned by a different account, stop and ask
@@ -32,8 +32,8 @@ The shared command is installed once at:
 Each authenticated user creates private session and workspace directories on
 first use. This installer never writes inside /scratch/<user>.
 
-The already-staged SIF and course release are not copied. Their exact paths and
-the SIF SHA-256 come from site.env and are verified before central changes.
+During a full installation, the already-staged SIF and course release are not
+copied. Their paths and the SIF SHA-256 come from site.env and are verified.
 No password, OTP, key, token, login host, IP, node, port, or account list is
 embedded in the shared command.
 EOF
@@ -73,7 +73,7 @@ done
 [[ "$site_env" == /* ]] || die INPUT_PATH_MUST_BE_ABSOLUTE
 [[ "$central_owner" =~ ^[A-Za-z_][A-Za-z0-9._-]*$ ]] || die CENTRAL_OWNER_INVALID
 
-for command_name in awk bash cat chmod cmp dirname flock grep head id install mktemp mv python3 readlink rm sha256sum stat; do
+for command_name in awk bash basename cat chmod cmp dirname flock grep head id install mktemp mv python3 readlink rm sha256sum stat; do
     command -v "$command_name" >/dev/null 2>&1 || die "MISSING_COMMAND_${command_name}"
 done
 stat -c '%u:%a' / >/dev/null 2>&1 || die GNU_STAT_REQUIRED
@@ -120,6 +120,121 @@ deployment_lock="$admin_root/deployment.lock"
     die CENTRAL_DEPLOYMENT_LOCK_NOT_SAFE
 exec 9<>"$deployment_lock"
 flock -x -n 9 || die CENTRAL_DEPLOYMENT_LOCK_BUSY
+
+# Course-only administration is intentionally isolated from the participant
+# runtime installer. It installs four trusted operator tools and returns before
+# reading the SIF, comparing runtime files, querying Slurm, or touching a user
+# workspace. This keeps a late course-content refresh independent from a local
+# runtime customization already proven on the pilot system.
+if (( admin_tools_only == 1 )); then
+    central_site_env="$central_root/config/site.env"
+    [[ "$site_env" == "$central_site_env" ]] || die ADMIN_TOOLS_SITE_ENV_MUST_BE_CENTRAL
+    [[ -f "$site_env" && ! -L "$site_env" && -r "$site_env" ]] || die SITE_ENV_NOT_SAFE
+    [[ "$(stat -c '%u' "$site_env")" == "$central_uid" ]] || die SITE_ENV_OWNER_MISMATCH
+    not_group_world_writable "$site_env" || die SITE_ENV_WRITABLE_BY_USER
+
+    declare -a admin_source_paths=(
+        "$tools_source_dir/validate_course.py"
+        "$tools_source_dir/validate_participant_release.py"
+        "$admin_source_dir/publish-course.sh"
+        "$admin_source_dir/refresh-course"
+    )
+    declare -a admin_target_paths=(
+        "$central_root/admin/libexec/validate_course.py"
+        "$central_root/admin/libexec/validate_participant_release.py"
+        "$central_root/admin/libexec/publish-course.sh"
+        "$central_root/admin/bin/refresh-course"
+    )
+    declare -a admin_target_modes=(0600 0600 0700 0700)
+    declare -a admin_target_directories=(
+        "$central_root/admin/libexec"
+        "$central_root/admin/bin"
+    )
+
+    for source_path in "${admin_source_paths[@]}"; do
+        [[ -f "$source_path" && ! -L "$source_path" ]] || \
+            die "ADMIN_SOURCE_MISSING_$(basename "$source_path")"
+        [[ "$(stat -c '%u' "$source_path")" == "$central_uid" ]] || \
+            die "ADMIN_SOURCE_OWNER_MISMATCH_$(basename "$source_path")"
+        not_group_world_writable "$source_path" || \
+            die "ADMIN_SOURCE_WRITABLE_$(basename "$source_path")"
+    done
+    bash -n "$admin_source_dir/publish-course.sh" "$admin_source_dir/refresh-course"
+
+    for directory in "${admin_target_directories[@]}"; do
+        if [[ -e "$directory" || -L "$directory" ]]; then
+            [[ -d "$directory" && ! -L "$directory" && \
+               "$(stat -c '%u:%a' "$directory")" == "$central_uid:700" ]] || \
+                die ADMIN_TOOL_DIRECTORY_NOT_SAFE
+        fi
+    done
+
+    admin_tool_changes=0
+    declare -a admin_actions=()
+    for index in "${!admin_source_paths[@]}"; do
+        source_path=${admin_source_paths[$index]}
+        target_path=${admin_target_paths[$index]}
+        target_mode=${admin_target_modes[$index]}
+        action=INSTALL
+        if [[ -e "$target_path" || -L "$target_path" ]]; then
+            [[ -f "$target_path" && ! -L "$target_path" ]] || \
+                die "ADMIN_TARGET_NOT_SAFE_${index}"
+            [[ "$(stat -c '%u:%a:%h' "$target_path")" == \
+               "$central_uid:${target_mode#0}:1" ]] || \
+                die "ADMIN_TARGET_METADATA_MISMATCH_${index}"
+            if cmp -s "$source_path" "$target_path"; then
+                action=ALREADY_CURRENT
+            else
+                action=UPDATE
+            fi
+        fi
+        admin_actions[$index]=$action
+        printf 'ADMIN_TOOL_ACTION=%s TARGET=%s\n' "$action" "$target_path"
+        [[ "$action" == ALREADY_CURRENT ]] || (( admin_tool_changes += 1 ))
+    done
+
+    if (( apply == 1 )); then
+        for directory in "${admin_target_directories[@]}"; do
+            if [[ ! -e "$directory" && ! -L "$directory" ]]; then
+                install -d -m 0700 "$directory"
+            fi
+            [[ -d "$directory" && ! -L "$directory" && \
+               "$(stat -c '%u:%a' "$directory")" == "$central_uid:700" ]] || \
+                die ADMIN_TOOL_DIRECTORY_NOT_SAFE
+        done
+        for index in "${!admin_source_paths[@]}"; do
+            source_path=${admin_source_paths[$index]}
+            target_path=${admin_target_paths[$index]}
+            target_mode=${admin_target_modes[$index]}
+            if [[ "${admin_actions[$index]}" != ALREADY_CURRENT ]]; then
+                target_dir="$(dirname -- "$target_path")"
+                tmp="$(mktemp "$target_dir/.ksc2026-admin-install.XXXXXXXX")"
+                install -m "$target_mode" "$source_path" "$tmp"
+                [[ "$(sha256sum "$tmp" | awk '{print $1}')" == \
+                   "$(sha256sum "$source_path" | awk '{print $1}')" ]] || \
+                    die ADMIN_TOOL_TEMP_SHA_MISMATCH
+                mv -- "$tmp" "$target_path"
+            fi
+            [[ -f "$target_path" && ! -L "$target_path" && \
+               "$(stat -c '%u:%a:%h' "$target_path")" == \
+               "$central_uid:${target_mode#0}:1" ]] || \
+                die "ADMIN_TOOL_POSTCHECK_METADATA_MISMATCH_${index}"
+            cmp -s "$source_path" "$target_path" || \
+                die "ADMIN_TOOL_POSTCHECK_CONTENT_MISMATCH_${index}"
+        done
+    fi
+
+    printf 'KSC_INSTALL_MODE=%s\n' "$([[ $apply == 1 ]] && printf APPLY || printf DRY_RUN)"
+    printf 'KSC_INSTALL_SCOPE=ADMIN_TOOLS_ONLY\n'
+    printf 'KSC_CENTRAL_CHANGES=%s\n' "$admin_tool_changes"
+    printf 'KSC_RUNTIME_CHECK=SKIPPED\n'
+    printf 'KSC_SIF_CHECK=SKIPPED\n'
+    printf 'KSC_SLURM_CHECK=SKIPPED\n'
+    printf 'KSC_ADMIN_TOOL_CHANGES=%s\n' "$admin_tool_changes"
+    printf 'KSC_COURSE_REFRESH_COMMAND=%s\n' "$central_root/admin/bin/refresh-course"
+    printf 'KSC_INSTALL_COMPLETE=yes\n'
+    exit 0
+fi
 
 [[ -f "$site_env" && ! -L "$site_env" && -r "$site_env" ]] || die SITE_ENV_NOT_SAFE
 [[ "$(stat -c '%u' "$site_env")" == "$central_uid" ]] || die SITE_ENV_OWNER_MISMATCH
@@ -371,11 +486,14 @@ for index in "${!source_paths[@]}"; do
     fi
 done
 
-if (( admin_tools_only == 1 && runtime_changes > 0 )); then
-    die ADMIN_TOOLS_ONLY_RUNTIME_MISMATCH
+runtime_changes_skipped=0
+selected_changes=$central_changes
+if (( admin_tools_only == 1 )); then
+    runtime_changes_skipped=$runtime_changes
+    selected_changes=$admin_tool_changes
 fi
 
-if (( apply == 1 && runtime_changes > 0 )); then
+if (( apply == 1 && admin_tools_only == 0 && runtime_changes > 0 )); then
     command -v squeue >/dev/null 2>&1 || die MISSING_COMMAND_squeue
     active_sessions="$(
         squeue --noheader --states=PENDING,CONFIGURING,RUNNING,COMPLETING,SUSPENDED \
@@ -427,8 +545,9 @@ fi
 
 printf 'KSC_INSTALL_MODE=%s\n' "$([[ $apply == 1 ]] && printf APPLY || printf DRY_RUN)"
 printf 'KSC_INSTALL_SCOPE=%s\n' "$([[ $admin_tools_only == 1 ]] && printf ADMIN_TOOLS_ONLY || printf FULL)"
-printf 'KSC_CENTRAL_CHANGES=%s\n' "$central_changes"
+printf 'KSC_CENTRAL_CHANGES=%s\n' "$selected_changes"
 printf 'KSC_RUNTIME_CHANGES=%s\n' "$runtime_changes"
+printf 'KSC_RUNTIME_CHANGES_SKIPPED=%s\n' "$runtime_changes_skipped"
 printf 'KSC_ADMIN_TOOL_CHANGES=%s\n' "$admin_tool_changes"
 printf 'KSC_SHARED_COMMAND=%s\n' "$central_root/bin/ksc2026"
 printf 'KSC_COURSE_REFRESH_COMMAND=%s\n' "$central_root/admin/bin/refresh-course"

@@ -94,7 +94,7 @@ mkdir -m 0700 -p "$KSC_PRIVATE"
 /scratch/hackathon/ksc2026/admin/bin/refresh-course
 ```
 
-신뢰 게시 도구가 아직 설치되지 않은 기존 환경에 이를 처음 추가할 때는 정확한 저장소 checkout에서 설치기를 `--admin-tools-only`로 실행합니다. 공용 Jupyter 런타임이 checkout과 다르면 이 모드는 아무 파일도 바꾸지 않고 중단합니다.
+신뢰 게시 도구가 아직 설치되지 않은 기존 환경에 이를 처음 추가할 때는 정확한 저장소 checkout에서 설치기를 `--admin-tools-only`로 실행합니다. 이 모드는 SIF·공용 Jupyter 런타임·Slurm Job·참가자 작업공간을 검사하거나 건드리지 않고, 검증기·게시기·refresh 명령만 설치합니다.
 
 GitHub push만으로는 중앙 게시본이 바뀌지 않습니다. 위 명령이 최신 `main` tip을 가져와 설치된 신뢰 도구로 검증하고, commit별 불변 release를 만든 뒤 중앙 설정을 원자적으로 전환합니다. 이 강의자료-only 갱신은 SIF, 공용 런타임, 활성 Slurm Job을 건드리지 않습니다.
 
