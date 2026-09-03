@@ -13,9 +13,13 @@ Usage:
   install-participants.sh \
     --site-env /secure/operator/site.env \
     --central-owner <CENTRAL_OWNER_ACCOUNT> \
+    [--admin-tools-only] \
     [--apply]
 
 Default: dry-run. Add --apply only after every planned action is reviewed.
+Use --admin-tools-only to install only the trusted course publisher, validators,
+and refresh command. That mode fails closed if the shared Jupyter runtime does
+not already match this source; it never updates runtime files.
 If /scratch/hackathon/ksc2026 is absent, the selected central owner creates it
 as mode 0755 and then runs --apply without sudo. If that fixed child path is a
 symlink or another file type, or is owned by a different account, stop and ask
@@ -43,17 +47,21 @@ die() {
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd -- "$script_dir/../../.." && pwd -P)"
 source_dir="$repo_root/operations/participant"
+admin_source_dir="$repo_root/operations/admin"
+tools_source_dir="$repo_root/tools"
 site_env=
 central_owner=
 central_parent=/scratch/hackathon
 central_root=/scratch/hackathon/ksc2026
 trusted_system_apptainer=/apps/common/apptainer/1.4.5/aarch64/bin/apptainer
 apply=0
+admin_tools_only=0
 
 while (( $# > 0 )); do
     case "$1" in
         --site-env) (( $# >= 2 )) || die MISSING_SITE_ENV_VALUE; site_env=$2; shift 2 ;;
         --central-owner) (( $# >= 2 )) || die MISSING_CENTRAL_OWNER_VALUE; central_owner=$2; shift 2 ;;
+        --admin-tools-only) admin_tools_only=1; shift ;;
         --apply) apply=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -198,6 +206,16 @@ require_trusted_executable() {
     done
 }
 
+central_site_env="$central_root/config/site.env"
+if [[ -e "$central_site_env" || -L "$central_site_env" ]]; then
+    require_admin_file "$central_site_env" CENTRAL_SITE_ENV
+    central_release_count="$(grep -c '^KSC_COURSE_RELEASE=' "$central_site_env" || true)"
+    [[ "$central_release_count" == 1 ]] || die CENTRAL_SITE_ENV_COURSE_RELEASE_INVALID
+    central_course_release="$(awk -F= '/^KSC_COURSE_RELEASE=/{print substr($0, index($0, "=") + 1)}' "$central_site_env")"
+    [[ "$central_course_release" == "${site[KSC_COURSE_RELEASE]}" ]] ||
+        die SITE_ENV_COURSE_RELEASE_WOULD_ROLL_BACK
+fi
+
 require_admin_file "${site[KSC_IMAGE]}" SIF
 require_admin_file "${site[KSC_COURSE_RELEASE]}" COURSE_RELEASE directory
 require_trusted_executable "${site[KSC_APPTAINER]}" APPTAINER
@@ -210,7 +228,17 @@ for source_name in ksc2026 start-jupyter session-controller.py jupyter-job.sh; d
     [[ "$(stat -c '%u' "$source_dir/$source_name")" == "$central_uid" ]] || die "SOURCE_OWNER_MISMATCH_${source_name}"
     not_group_world_writable "$source_dir/$source_name" || die "SOURCE_WRITABLE_${source_name}"
 done
-bash -n "$source_dir/ksc2026" "$source_dir/start-jupyter" "$source_dir/jupyter-job.sh"
+for source_path in \
+    "$admin_source_dir/refresh-course" \
+    "$admin_source_dir/publish-course.sh" \
+    "$tools_source_dir/validate_course.py" \
+    "$tools_source_dir/validate_participant_release.py"; do
+    [[ -f "$source_path" && ! -L "$source_path" ]] || die "ADMIN_SOURCE_MISSING_$(basename "$source_path")"
+    [[ "$(stat -c '%u' "$source_path")" == "$central_uid" ]] || die "ADMIN_SOURCE_OWNER_MISMATCH_$(basename "$source_path")"
+    not_group_world_writable "$source_path" || die "ADMIN_SOURCE_WRITABLE_$(basename "$source_path")"
+done
+bash -n "$source_dir/ksc2026" "$source_dir/start-jupyter" "$source_dir/jupyter-job.sh" \
+    "$admin_source_dir/refresh-course" "$admin_source_dir/publish-course.sh"
 runtime_python="$(command -v python3)"
 if ! "$runtime_python" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)' >/dev/null 2>&1; then
     if ! type module >/dev/null 2>&1; then
@@ -256,7 +284,9 @@ config = module.parse_site_config(site_env)
 module.read_course(config, site_env, central_owner)
 ' "$source_dir" "$site_env" "$central_owner" || die ACTUAL_CONTROLLER_COURSE_RELEASE_REJECTED
 "$runtime_python" -B -c 'import pathlib, sys; [compile(pathlib.Path(p).read_text(encoding="utf-8"), p, "exec") for p in sys.argv[1:]]' \
-    "$source_dir/session-controller.py" || die PYTHON_SOURCE_INVALID
+    "$source_dir/session-controller.py" \
+    "$tools_source_dir/validate_course.py" \
+    "$tools_source_dir/validate_participant_release.py" || die PYTHON_SOURCE_INVALID
 
 entrypoint_source="$source_dir/ksc2026"
 entrypoint_target="$central_root/bin/ksc2026"
@@ -281,24 +311,45 @@ declare -a source_paths=(
     "$source_dir/session-controller.py"
     "$source_dir/jupyter-job.sh"
     "$site_env"
+    "$tools_source_dir/validate_course.py"
+    "$tools_source_dir/validate_participant_release.py"
+    "$admin_source_dir/publish-course.sh"
+    "$admin_source_dir/refresh-course"
 )
 declare -a target_paths=(
     "$central_root/bin/start-jupyter"
     "$central_root/bin/session-controller.py"
     "$central_root/slurm/jupyter-job.sh"
     "$central_root/config/site.env"
+    "$central_root/admin/libexec/validate_course.py"
+    "$central_root/admin/libexec/validate_participant_release.py"
+    "$central_root/admin/libexec/publish-course.sh"
+    "$central_root/admin/bin/refresh-course"
 )
-declare -a target_modes=(0755 0644 0755 0644)
+declare -a target_modes=(0755 0644 0755 0644 0600 0600 0700 0700)
 
-for directory in "$central_root/bin" "$central_root/config" "$central_root/slurm"; do
+declare -a managed_directories=(
+    "$central_root/bin"
+    "$central_root/config"
+    "$central_root/slurm"
+    "$central_root/admin/libexec"
+    "$central_root/admin/bin"
+)
+declare -a managed_directory_modes=(0755 0755 0755 0700 0700)
+for index in "${!managed_directories[@]}"; do
+    directory=${managed_directories[$index]}
+    directory_mode=${managed_directory_modes[$index]}
     if [[ -e "$directory" || -L "$directory" ]]; then
         [[ -d "$directory" && ! -L "$directory" && \
-           "$(stat -c '%u:%a' "$directory")" == "$central_uid:755" ]] || die CENTRAL_DIRECTORY_NOT_SAFE
+           "$(stat -c '%u:%a' "$directory")" == "$central_uid:${directory_mode#0}" ]] || die CENTRAL_DIRECTORY_NOT_SAFE
     fi
 done
 
 central_changes=0
+runtime_changes=0
+admin_tool_changes=0
 [[ "$entrypoint_action" == ALREADY_CURRENT ]] || (( central_changes += 1 ))
+[[ "$entrypoint_action" == ALREADY_CURRENT ]] || (( runtime_changes += 1 ))
 for index in "${!source_paths[@]}"; do
     source_path=${source_paths[$index]}; target_path=${target_paths[$index]}; target_mode=${target_modes[$index]}
     source_sha="$(sha256sum "$source_path" | awk '{print $1}')"
@@ -310,10 +361,21 @@ for index in "${!source_paths[@]}"; do
     fi
     printf 'CENTRAL_SOURCE_SHA256=%s SOURCE=%s\n' "$source_sha" "$source_path"
     printf 'CENTRAL_ACTION=%s TARGET=%s\n' "$action" "$target_path"
-    [[ "$action" == ALREADY_CURRENT ]] || (( central_changes += 1 ))
+    if [[ "$action" != ALREADY_CURRENT ]]; then
+        (( central_changes += 1 ))
+        if (( index < 4 )); then
+            (( runtime_changes += 1 ))
+        else
+            (( admin_tool_changes += 1 ))
+        fi
+    fi
 done
 
-if (( apply == 1 && central_changes > 0 )); then
+if (( admin_tools_only == 1 && runtime_changes > 0 )); then
+    die ADMIN_TOOLS_ONLY_RUNTIME_MISMATCH
+fi
+
+if (( apply == 1 && runtime_changes > 0 )); then
     command -v squeue >/dev/null 2>&1 || die MISSING_COMMAND_squeue
     active_sessions="$(
         squeue --noheader --states=PENDING,CONFIGURING,RUNNING,COMPLETING,SUSPENDED \
@@ -323,13 +385,17 @@ if (( apply == 1 && central_changes > 0 )); then
 fi
 
 if (( apply == 1 )); then
-    for directory in "$central_root/bin" "$central_root/config" "$central_root/slurm"; do
+    for index in "${!managed_directories[@]}"; do
+        (( admin_tools_only == 1 && index < 3 )) && continue
+        directory=${managed_directories[$index]}
+        directory_mode=${managed_directory_modes[$index]}
         if [[ ! -e "$directory" && ! -L "$directory" ]]; then
-            install -d -m 0755 "$directory"
+            install -d -m "$directory_mode" "$directory"
         fi
-        [[ -d "$directory" && ! -L "$directory" && "$(stat -c '%u:%a' "$directory")" == "$central_uid:755" ]] || die CENTRAL_DIRECTORY_NOT_SAFE
+        [[ -d "$directory" && ! -L "$directory" && \
+           "$(stat -c '%u:%a' "$directory")" == "$central_uid:${directory_mode#0}" ]] || die CENTRAL_DIRECTORY_NOT_SAFE
     done
-    if [[ "$entrypoint_action" == INSTALL ]]; then
+    if (( admin_tools_only == 0 )) && [[ "$entrypoint_action" == INSTALL ]]; then
         entrypoint_tmp="$(mktemp "$central_root/bin/.ksc2026-entrypoint.XXXXXXXX")"
         install -m "$entrypoint_mode" "$entrypoint_source" "$entrypoint_tmp"
         [[ "$(sha256sum "$entrypoint_tmp" | awk '{print $1}')" == "$entrypoint_sha" ]] || \
@@ -344,6 +410,7 @@ if (( apply == 1 )); then
         die CENTRAL_ENTRYPOINT_POSTCHECK_CONTENT_MISMATCH
 
     for index in "${!source_paths[@]}"; do
+        (( admin_tools_only == 1 && index < 4 )) && continue
         source_path=${source_paths[$index]}; target_path=${target_paths[$index]}; target_mode=${target_modes[$index]}
         if [[ ! -e "$target_path" ]] || ! cmp -s "$source_path" "$target_path"; then
             target_dir="$(dirname -- "$target_path")"
@@ -359,6 +426,10 @@ if (( apply == 1 )); then
 fi
 
 printf 'KSC_INSTALL_MODE=%s\n' "$([[ $apply == 1 ]] && printf APPLY || printf DRY_RUN)"
+printf 'KSC_INSTALL_SCOPE=%s\n' "$([[ $admin_tools_only == 1 ]] && printf ADMIN_TOOLS_ONLY || printf FULL)"
 printf 'KSC_CENTRAL_CHANGES=%s\n' "$central_changes"
+printf 'KSC_RUNTIME_CHANGES=%s\n' "$runtime_changes"
+printf 'KSC_ADMIN_TOOL_CHANGES=%s\n' "$admin_tool_changes"
 printf 'KSC_SHARED_COMMAND=%s\n' "$central_root/bin/ksc2026"
+printf 'KSC_COURSE_REFRESH_COMMAND=%s\n' "$central_root/admin/bin/refresh-course"
 printf 'KSC_INSTALL_COMPLETE=yes\n'

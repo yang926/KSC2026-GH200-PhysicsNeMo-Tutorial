@@ -64,7 +64,7 @@ def assert_source_contract() -> None:
         '"$central_uid:644:1"',
         "flock -x -n 9",
         "CENTRAL_ENTRYPOINT_IMMUTABLE_CONTENT_MISMATCH",
-        'if [[ "$entrypoint_action" == INSTALL ]]',
+        'if (( admin_tools_only == 0 )) && [[ "$entrypoint_action" == INSTALL ]]',
         'entrypoint_target="$central_root/bin/ksc2026"',
     ):
         require(marker in installer, f"installer atomic-runtime marker missing: {marker}")

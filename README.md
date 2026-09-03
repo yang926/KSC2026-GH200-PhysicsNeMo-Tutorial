@@ -12,9 +12,11 @@
 
 ---
 
+이 문서는 과정 전체의 개념·실습 순서·완료 기준을 설명하는 안내서입니다. JupyterLab에서 바로 실행할 첫 단계는 [`00_Start_Here.ipynb`](00_Start_Here.ipynb)에 모아 두었습니다.
+
 ## 행사 당일 JupyterLab 접속
 
-강의 슬라이드(PPT)에 안내된 PILOT SSH 명령으로 로그인한 뒤 공용 명령을 실행하면, Slurm이 현재 사용 가능한 계산 노드의 NVIDIA GH200 한 개를 배정합니다. 로컬 터미널과 웹 브라우저를 준비하세요.
+강의 슬라이드(PPT)에 안내된 PILOT SSH 명령으로 로그인한 뒤 공용 명령을 실행하면, Slurm이 현재 사용 가능한 계산 노드의 NVIDIA GH200 한 개를 배정합니다. 참가자 컴퓨터에서 로컬 터미널 두 개와 웹 브라우저를 사용합니다.
 
 1. **로컬 터미널 1**에서 강의 슬라이드(PPT)에 안내된 PILOT SSH 명령을 실행하고 OTP와 비밀번호를 입력합니다.
 2. PILOT 로그인 노드에 접속되면 다음 한 줄을 실행합니다.
@@ -51,6 +53,8 @@
 
 최신 강의자료로 바꿀 때는 먼저 파일을 저장하고 `--stop`을 실행한 뒤 `--refresh`를 실행합니다. 이전 작업공간은 삭제하거나 덮어쓰지 않습니다.
 
+`--refresh`는 GitHub에 직접 접속하지 않고, 중앙 운영자가 검증해 게시한 최신 강의자료를 새 개인 작업공간에 복사합니다. GitHub `main`의 변경은 중앙 운영자가 게시한 뒤에 참가자에게 제공됩니다.
+
 ## 과정 개요
 
 전체 과정은 환경 점검, GH200 시스템 실습, PhysicsNeMo 물리 AI 실습 순서로 진행합니다.
@@ -82,7 +86,7 @@
 | 0 | ARM64·GH200·실행 환경 확인 | Python, CUDA, Jupyter | 환경 점검 출력 | 필수 항목이 모두 `READY` |
 | 1-1 | 같은 DGEMM을 두 빌드 구성으로 실행 | GCC, `nvc`, OpenBLAS, NVPL | 실행 파일 2개, 체크섬, GFLOP/s 표 | 두 결과의 체크섬 일치와 성능 변화 설명 |
 | 1-2 | 세 메모리 방식의 실행 경로 비교 | CUDA, Nsight Systems, nvbandwidth | CUDA 실행 파일, `.nsys-rep`, 대역폭 결과 | 데이터 이동과 측정 지표의 차이 설명 |
-| 2-1 | 초기조건과 ODE 잔차로 궤적 학습 | PhysicsNeMo-Sym, PyTorch | checkpoint, `validator.npz`, 예측 그래프 | 검증 오차와 외삽 구간 해석 |
+| 2-1 | 초기조건과 ODE 잔차로 궤적 학습 | PhysicsNeMo-Sym, PyTorch | 체크포인트, `validator.npz`, `inferencer_data.npz`, 예측 그래프 | 학습 구간과 외삽 구간의 오차 해석 |
 | 2-2 | 여러 소스항에 대응하는 Poisson 해 학습 | PhysicsNeMo FNO, PyTorch | metrics JSON, 테스트 예측 그림 | 처음 보는 소스항의 오차·시간·메모리 해석 |
 | 선택 | FNO 푸리에 모드 수 변경 | PhysicsNeMo FNO | 설정별 metrics, 비교표·그래프 | 모드 수에 따른 오차와 계산 비용 비교 |
 
@@ -115,7 +119,7 @@ Nsight Systems에서는 CUDA API·메모리 작업·커널 실행 순서를 확�
 
 ### 발사체 운동 PINN
 
-발사체 PINN은 정답 궤적을 학습 손실에 사용하지 않습니다. 해석해는 학습을 마친 뒤 정확도를 평가할 때 사용합니다. 학습에는 다음 초기조건과 운동방정식의 잔차를 사용합니다.
+발사체 PINN은 정답 궤적을 가중치 업데이트에 사용하지 않습니다. 해석해는 학습 중 정기 검증과 학습 종료 후 정확도 확인에 사용합니다. 학습 손실에는 다음 초기조건과 운동방정식의 잔차가 들어갑니다.
 
 $$
 x(0)=0, \quad y(0)=0, \quad
@@ -145,7 +149,64 @@ FNO는 공간 패턴을 주파수별 성분으로 표현하고, 선택한 푸리
 
 ## 실습 환경
 
-아래 버전은 SHA-256이 `ee43b2c0735b26a7168e53c7e598dd5dc527b1e23284682f790430656d8bdacf`인 ARM64 SIF를 2026년 8월 30일 KISTI PILOT에서 직접 열어 관측한 값입니다.
+### Jupyter와 교육용 컨테이너의 동작 방식
+
+```text
+참가자 컴퓨터의 브라우저
+        │  SSH 터널
+        ▼
+PILOT 로그인 노드의 공용 런처
+        │  Slurm Job 제출
+        ▼
+배정된 GH200 계산 노드 ── Apptainer로 교육용 SIF 실행
+        │                    ├─ JupyterLab·Python
+        │                    ├─ PhysicsNeMo·PyTorch
+        │                    └─ 컴파일러·프로파일러
+        ▼
+개인 /scratch 작업공간을 연결해 노트북과 결과 저장
+```
+
+SIF(Singularity Image Format)는 Apptainer가 실행하는 단일 컨테이너 이미지 파일입니다. 소프트웨어는 중앙 SIF에서 실행하고, 참가자가 수정한 노트북과 결과만 개인 `/scratch` 작업공간에 저장합니다. 따라서 행사 중에는 PhysicsNeMo를 설치하지 않고 Python에서 다음 모듈을 바로 불러옵니다.
+
+```python
+import physicsnemo
+import physicsnemo.sym
+```
+
+행사 중에는 계산 노드가 오프라인이므로 `pip install`을 실행하지 않습니다.
+
+### 행사 후 개인 환경에서 PhysicsNeMo 사용
+
+개인 환경이 [PhysicsNeMo 시스템 요구사항](https://docs.nvidia.com/physicsnemo/latest/getting-started/system_requirements.html)을 만족한다면 Python 가상환경에 최신 패키지를 설치할 수 있습니다. 아래 명령은 기본·CPU 검증용입니다.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install "nvidia-physicsnemo[sym]"
+```
+
+NVIDIA GPU를 사용하는 새 환경에서는 위 명령을 그대로 복사하기 전에 [공식 설치 안내](https://docs.nvidia.com/physicsnemo/latest/getting-started/installation.html)의 호환표에서 PyTorch와 CUDA 조합을 확인합니다. 문서가 안내하는 환경에 맞춰 `cu12` 또는 `cu13` extra를 `sym`과 함께 선택하거나, 호환되는 PyTorch를 먼저 설치합니다. 운영체제·드라이버·CUDA 버전에 관계없이 통하는 단일 GPU 설치 명령은 없습니다.
+
+설치 뒤에는 패키지 이름이 아니라 다음 import 이름으로 확인합니다.
+
+```python
+from importlib.metadata import version
+import torch
+import physicsnemo
+import physicsnemo.sym
+
+print("PhysicsNeMo:", version("nvidia-physicsnemo"))
+print("CUDA 사용 가능:", torch.cuda.is_available())
+```
+
+`torch.cuda.is_available()`이 `False`이면 PhysicsNeMo import 성공과 별개로 NVIDIA 드라이버·CUDA가 연결된 실행 환경인지 확인해야 합니다. 설치 가능한 Python·PyTorch·CUDA 조합은 [공식 설치 안내](https://docs.nvidia.com/physicsnemo/latest/getting-started/installation.html)를 우선합니다.
+
+이 과정의 노트북은 고정된 **PhysicsNeMo 25.11 SIF**를 기준으로 작성했습니다. 최신 PhysicsNeMo v2.0에서는 API 구성이 달라졌으므로 기존 `Solver`·`Domain`·`Constraint` 코드를 그대로 실행하기보다 [v2.0 migration guide](https://github.com/NVIDIA/physicsnemo/blob/main/v2.0-MIGRATION-GUIDE.md)와 최신 예제를 기준으로 옮깁니다. 행사와 같은 25.11 환경을 정확히 재현해야 할 때만 공식 25.11 컨테이너를 선택하면 됩니다. 일반적인 새 프로젝트에서 컨테이너 사용은 필수가 아닙니다.
+
+### 검증된 이미지 구성
+
+아래 버전은 SHA-256이 `ee43b2c0735b26a7168e53c7e598dd5dc527b1e23284682f790430656d8bdacf`인 ARM64 SIF를 2026년 8월 30일 KISTI PILOT에서 검증한 결과입니다.
 
 | 구성 | 설치 버전 | 실습에서 사용하는 기능 |
 |---|---|---|
@@ -190,7 +251,7 @@ FNO는 공간 패턴을 주파수별 성분으로 표현하고, 선택한 푸리
 └── course-release.json
 ```
 
-`labs/`는 노트북이 호출하는 지원 파일입니다. 노트북의 안내 없이 직접 수정할 필요는 없습니다. `work/`와 각 PhysicsNeMo 실습의 `outputs/`는 실행 중 생성되며 재접속 후에도 남습니다.
+[`labs/`](labs/README.md)는 노트북이 호출하는 지원 파일입니다. 노트북에서 직접 수정하도록 안내한 부분만 바꿉니다. `work/`와 각 PhysicsNeMo 실습의 `outputs/`는 실행 중 생성되며 재접속 후에도 남습니다.
 
 ## 추가 학습 자료
 
@@ -216,3 +277,5 @@ PhysicsNeMo 과정은 공개 [OpenHackathons AI-Powered-Physics-Bootcamp](https:
 ### 중앙 환경 운영자
 
 행사 공용 `/scratch/hackathon/ksc2026/bin/ksc2026` 배포 순서는 [온라인 공용 런처 배포 매뉴얼](https://github.com/yang926/KSC2026-GH200-PhysicsNeMo-Tutorial/blob/main/operations/admin/participant/KSC2026-Shared-Launcher-Deployment-Guide.md)을 사용합니다. 중앙 owner는 `sudo` 없이 운영하며, 기존 배포의 갱신·복구는 [상세 운영 매뉴얼](https://github.com/yang926/KSC2026-GH200-PhysicsNeMo-Tutorial/blob/main/operations/admin/participant/KSC2026-Admin-Deployment-Guide.md)을 따릅니다.
+
+강의자료만 바뀌었다면 GitHub `main`에 push한 뒤 PILOT 로그인 노드에서 중앙 owner가 `/scratch/hackathon/ksc2026/admin/bin/refresh-course`를 한 번 실행합니다. GitHub push만으로 중앙 게시본이 자동 변경되지는 않습니다.

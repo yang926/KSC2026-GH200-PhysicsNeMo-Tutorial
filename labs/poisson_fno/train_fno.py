@@ -11,9 +11,11 @@ profile with::
 
 This follows NVIDIA's PhysicsNeMo-Sym Darcy FNO pattern: ``DictGridDataset``,
 decoder construction, FNO construction, a supervised grid constraint, and a
-grid validator. The validation split is used while training; the held-out test
-split is evaluated only after ``Solver.solve()``. Reported test metrics describe
-that final in-memory state and are not labelled as a "best checkpoint".
+grid validator. The validation split is used while training. The held-out test
+split is evaluated once before training and once after ``Solver.solve()`` to
+show the change caused by training; neither evaluation updates the weights.
+Final metrics describe the in-memory state after ``solve()`` and are not
+labelled as a "best checkpoint".
 """
 
 from __future__ import annotations
@@ -146,7 +148,8 @@ def _save_test_example(
     invar_test: Dict[str, np.ndarray],
     outvar_test: Dict[str, np.ndarray],
     path: str | Path,
-) -> Dict[str, float | str]:
+    sample_index: int,
+) -> Dict[str, float | int | str]:
     """Save a four-panel held-out test example and return sample metadata."""
 
     import matplotlib
@@ -154,9 +157,17 @@ def _save_test_example(
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    sample_count = int(invar_test["f"].shape[0])
+    if not 0 <= sample_index < sample_count:
+        raise IndexError(
+            f"test_example_index must be in [0, {sample_count}), got {sample_index}"
+        )
+
     device = next(model.parameters()).device
-    source = torch.from_numpy(invar_test["f"][:1]).to(device=device)
-    target = outvar_test["u"][0, 0]
+    source = torch.from_numpy(
+        invar_test["f"][sample_index : sample_index + 1]
+    ).to(device=device)
+    target = outvar_test["u"][sample_index, 0]
 
     was_training = model.training
     model.eval()
@@ -164,7 +175,7 @@ def _save_test_example(
     if was_training:
         model.train()
 
-    source_field = invar_test["f"][0, 0]
+    source_field = invar_test["f"][sample_index, 0]
     absolute_error = np.abs(prediction - target)
     denominator = float(np.linalg.norm(target))
     sample_relative_l2 = float(np.linalg.norm(prediction - target) / denominator)
@@ -173,19 +184,19 @@ def _save_test_example(
     destination.parent.mkdir(parents=True, exist_ok=True)
     figure, axes = plt.subplots(1, 4, figsize=(15, 3.6), constrained_layout=True)
     fields = (source_field, target, prediction, absolute_error)
-    titles = ("f (source term)", "u (target)", "u_pred", "|u_pred - u|")
+    titles = ("f (소스항)", "u (정답)", "u_pred (예측)", "|u_pred - u| (절대 오차)")
     for axis, field, title in zip(axes, fields, titles):
         image = axis.imshow(
             field,
             origin="lower",
-            cmap="magma" if title == "|u_pred - u|" else "coolwarm",
+            cmap="magma" if "절대 오차" in title else "coolwarm",
         )
         axis.set_title(title)
-        axis.set_xlabel("grid x")
-        axis.set_ylabel("grid y")
+        axis.set_xlabel("격자 x")
+        axis.set_ylabel("격자 y")
         figure.colorbar(image, ax=axis, fraction=0.046, pad=0.04)
     figure.suptitle(
-        f"test sample 0 · relative L2={sample_relative_l2:.3e}",
+        f"테스트 표본 {sample_index} · 상대 L2={sample_relative_l2:.3e}",
         fontsize=12,
     )
     figure.savefig(destination, dpi=150, bbox_inches="tight")
@@ -193,14 +204,14 @@ def _save_test_example(
     print(f"테스트 표본 그림 저장: {destination}")
     return {
         "path": str(destination),
-        "sample_index": 0,
+        "sample_index": sample_index,
         "sample_relative_l2": sample_relative_l2,
     }
 
 
 @physicsnemo.sym.main(config_path="conf", config_name="config_FNO")
 def run(cfg: PhysicsNeMoConfig) -> None:
-    """Build the configured FNO, train on train/val, then test once."""
+    """Build the FNO and compare held-out test metrics before and after training."""
 
     # PhysicsNeMo writes checkpoints and validators relative to network_dir.
     # Resolve it against Hydra's original working directory so outputs stay
@@ -229,6 +240,13 @@ def run(cfg: PhysicsNeMoConfig) -> None:
     invar_test, outvar_test = load_dataset(
         test_file, expected_profile=profile, expected_split="test"
     )
+    test_example_index = int(cfg.custom.test_example_index)
+    test_sample_count = int(invar_test["f"].shape[0])
+    if not 0 <= test_example_index < test_sample_count:
+        raise ValueError(
+            "custom.test_example_index must be in "
+            f"[0, {test_sample_count}), got {test_example_index}"
+        )
 
     grid_shapes = {
         tuple(invar_train["f"].shape[2:]),
@@ -293,6 +311,16 @@ def run(cfg: PhysicsNeMoConfig) -> None:
     )
     domain.add_validator(validator, "validation")
 
+    # Record the randomly initialized model once so the notebook can show what
+    # training changed. This uses the held-out test split for observation only;
+    # no gradient or weight update is performed.
+    metrics_before_training = evaluate_held_out_test(
+        fno,
+        invar_test,
+        outvar_test,
+        batch_size=int(cfg.batch_size.test),
+    )
+
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
 
@@ -302,7 +330,7 @@ def run(cfg: PhysicsNeMoConfig) -> None:
     # Evaluate the held-out test split using the model state that remains after
     # solve(). No checkpoint is selected or loaded here, so this is not a claim
     # about the best validation checkpoint.
-    test_metrics = evaluate_held_out_test(
+    metrics_after_training = evaluate_held_out_test(
         fno,
         invar_test,
         outvar_test,
@@ -317,6 +345,7 @@ def run(cfg: PhysicsNeMoConfig) -> None:
         invar_test,
         outvar_test,
         metrics_destination.parent / "held_out_test_example.png",
+        test_example_index,
     )
     payload: Dict[str, object] = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -348,7 +377,17 @@ def run(cfg: PhysicsNeMoConfig) -> None:
             "peak_memory_allocated_bytes": peak_memory_allocated_bytes,
             "scope": "PyTorch peak allocated memory for this process; not total GPU usage",
         },
-        "metrics": test_metrics,
+        "metrics_before_training": metrics_before_training,
+        # Keep the established ``metrics`` key for downstream notebooks and
+        # add an explicit alias that makes the before/after comparison clear.
+        "metrics": metrics_after_training,
+        "metrics_after_training": metrics_after_training,
+        "training_effect": {
+            "relative_l2_error_ratio_after_over_before": (
+                metrics_after_training["relative_l2"]
+                / metrics_before_training["relative_l2"]
+            )
+        },
         "artifacts": {"held_out_test_example": test_example},
         "candidate_note": str(cfg.custom.candidate_note),
     }
@@ -356,9 +395,16 @@ def run(cfg: PhysicsNeMoConfig) -> None:
 
     print("=" * 72)
     print("별도 테스트 데이터 평가 — 학습 종료 시점 모델")
-    print(f"RMSE:        {test_metrics['rmse']:.6e}")
-    print(f"MAE:         {test_metrics['mae']:.6e}")
-    print(f"상대 L2 오차: {test_metrics['relative_l2']:.6e}")
+    print(
+        "학습 전 상대 L2 오차: "
+        f"{metrics_before_training['relative_l2']:.6e}"
+    )
+    print(f"학습 후 RMSE:        {metrics_after_training['rmse']:.6e}")
+    print(f"학습 후 MAE:         {metrics_after_training['mae']:.6e}")
+    print(
+        "학습 후 상대 L2 오차: "
+        f"{metrics_after_training['relative_l2']:.6e}"
+    )
     print(f"학습 파라미터 수: {trainable_parameters:,}")
     if peak_memory_allocated_bytes is not None:
         print(f"최대 PyTorch 메모리: {peak_memory_allocated_bytes / 2**30:.2f} GiB")

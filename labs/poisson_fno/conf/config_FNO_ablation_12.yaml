@@ -51,6 +51,7 @@ custom:
   profile: recovery
   experiment_label: ablation_modes_12
   random_seed: 2026
+  test_example_index: 0
   train_file: datasets/Poisson_Fourier_Recovery/train.hdf5
   validation_file: datasets/Poisson_Fourier_Recovery/val.hdf5
   test_file: datasets/Poisson_Fourier_Recovery/test.hdf5

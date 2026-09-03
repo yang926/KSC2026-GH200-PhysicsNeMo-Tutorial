@@ -59,7 +59,8 @@ operations/
 │   └── site.env.example          # 공개 가능한 사이트 설정 예시
 ├── admin/
 │   ├── participant/              # 중앙 런처 설치·검증 도구와 매뉴얼
-│   └── publish-course.sh         # 검증된 commit을 중앙 release로 게시
+│   ├── publish-course.sh         # 검증된 commit을 중앙 release로 게시
+│   └── refresh-course            # 설치되는 중앙 owner용 강의자료 갱신 도구
 └── KSC2026-Pilot-Validation-Guide.md
 ```
 
@@ -67,6 +68,7 @@ operations/
 
 ```text
 /scratch/hackathon/ksc2026/
+├── admin/bin/       # 중앙 owner만 실행하는 강의자료 게시 명령
 ├── bin/             # 모든 사용자가 실행하는 공용 명령
 ├── config/          # 런타임 사이트 설정
 ├── images/          # 중앙 ARM64 SIF와 SHA-256
@@ -86,8 +88,8 @@ SIF와 공용 런처를 사용자마다 복사하지 않습니다. 개인 폴더
 1. `/scratch/hackathon/ksc2026`의 경로, owner, mode, canonical 경로와 symlink 여부를 확인합니다.
 2. 검증된 ARM64 SIF 한 벌과 SHA-256을 중앙 경로에서 확인합니다.
 3. 실제 로그인 호스트, Slurm 파티션, GRES, Apptainer, SIF, 강의 release와 24시간 제한을 private `site.env`에 기록합니다.
-4. GitHub `main`의 정확한 commit을 `publish-course.sh`로 읽기 전용 release에 게시합니다.
-5. 공용 런처 설치기를 dry-run한 뒤 같은 입력으로 적용합니다.
+4. 최초 배포에서 GitHub `main`의 정확한 commit을 검증하고 읽기 전용 release로 게시합니다.
+5. 공용 런처와 중앙 owner용 신뢰 도구를 dry-run한 뒤 같은 입력으로 설치합니다.
 6. 시험 계정 한 개에서 `사전점검 → 시작 → 터널 → token HTTP → 저장 → 단절 → 재접속 → 종료`를 실제 검증합니다.
 
 정적 테스트는 전체 계정의 실제 Job 실행을 뜻하지 않습니다. 행사 전 실환경 E2E는 시험 계정 한 개로 먼저 수행하고, 필요하면 별도의 소규모 동시 접속 시험을 추가합니다.
@@ -116,10 +118,22 @@ SIF와 공용 런처를 사용자마다 복사하지 않습니다. 개인 폴더
 
 SSH나 브라우저 연결이 끊겨도 런처는 Job을 자동으로 취소하지 않습니다. 공용 명령을 다시 실행하면 활성 Job의 실제 상태를 확인하고 같은 token과 작업공간에 재접속합니다. Job이 끝난 뒤에도 저장 파일은 남지만 Python 변수, GPU 메모리와 실행 중이던 셀은 사라집니다.
 
+## 강의자료 게시와 참가자 갱신
+
+GitHub `main`에 push했다고 중앙 강의자료나 참가자 작업공간이 즉시 바뀌지는 않습니다. 중앙 owner가 PILOT 로그인 노드에서 다음 명령을 한 번 실행해야 합니다.
+
+```bash
+/scratch/hackathon/ksc2026/admin/bin/refresh-course
+```
+
+이 명령은 GitHub `main`의 최신 commit을 가져와 설치된 신뢰 검증기로 검사한 뒤, commit별 불변 release를 만들고 중앙 설정이 그 release를 가리키도록 원자적으로 전환합니다. 최신 게시가 끝난 뒤에도 이미 실행 중인 Job과 작업공간은 그대로 남습니다.
+
+참가자의 `ksc2026 --refresh`는 GitHub에 접속하지 않습니다. 중앙 owner가 마지막으로 게시한 release를 새 개인 작업공간으로 복사하며, 기존 작업공간은 보존합니다. 노트북·README·실습 코드·강의 이미지만 갱신할 때는 중앙 SIF, 공용 Jupyter 런타임, 활성 Slurm Job을 교체하지 않습니다.
+
 ## 오프라인 실행과 보안
 
 - 계산 노드에서는 `apt`, `pip install`, `git clone`, `wget`, `curl`을 실행하지 않습니다.
-- GitHub 갱신과 release 게시 작업은 인터넷이 되는 로그인 노드에서만 수행합니다.
+- GitHub 갱신과 release 게시 작업은 인터넷이 되는 로그인 노드에서 중앙 owner만 수행합니다. 참가자 명령은 GitHub에 접속하지 않습니다.
 - OTP와 비밀번호는 OpenSSH 프롬프트에만 입력하며 스크립트, 로그 또는 채팅에 저장하지 않습니다.
 - Jupyter token은 활성 세션의 개인 mode `0600` 상태 파일에만 보관합니다.
 - 공개 저장소에는 실제 로그인 호스트, IP 주소, 계정, token, private `site.env`와 운영 로그를 넣지 않습니다.

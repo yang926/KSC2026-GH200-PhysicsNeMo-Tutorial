@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import argparse
 import ast
 import json
 import os
@@ -16,7 +17,10 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 
-ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_ROOT = Path(__file__).resolve().parents[1]
+ROOT = DEFAULT_ROOT
+PARTICIPANT_VALIDATOR = ROOT / "tools/validate_participant_release.py"
+STATIC_ONLY = False
 
 BOOST_VERSION = "1.83.0"
 BOOST_SOURCE = "https://archives.boost.io/release/1.83.0/source/boost_1_83_0.tar.gz"
@@ -72,12 +76,14 @@ REQUIRED_PATHS = (
     "container/third-party-sources.json",
     "operations/README.md",
     "operations/admin/publish-course.sh",
+    "operations/admin/refresh-course",
     "operations/admin/participant/README.md",
     "operations/admin/participant/KSC2026-Shared-Launcher-Deployment-Guide.md",
     "operations/admin/participant/KSC2026-Admin-Deployment-Guide.md",
     "operations/admin/participant/install-participants.sh",
     "operations/admin/participant/tests/run-tests.sh",
     "operations/admin/participant/tests/test-runtime-lock.py",
+    "operations/admin/participant/tests/test_trusted_course_validation.py",
     "operations/KSC2026-Pilot-Validation-Guide.md",
     "operations/participant/README.md",
     "operations/participant/site.env.example",
@@ -103,14 +109,15 @@ PARTICIPANT_PATHS = (
     "course-release.json",
 )
 
-ACTIVE_NOTEBOOKS = (
-    ROOT / "00_Start_Here.ipynb",
-    ROOT / "01_GH200/01_CPU_Compile_and_Tune.ipynb",
-    ROOT / "01_GH200/02_GPU_Memory_Profile.ipynb",
-    ROOT / "02_PhysicsNeMo/01_Projectile_PINN.ipynb",
-    ROOT / "02_PhysicsNeMo/02_Poisson_FNO.ipynb",
-    ROOT / "02_PhysicsNeMo/optional/FNO_Mode_Ablation.ipynb",
+ACTIVE_NOTEBOOK_PATHS = (
+    "00_Start_Here.ipynb",
+    "01_GH200/01_CPU_Compile_and_Tune.ipynb",
+    "01_GH200/02_GPU_Memory_Profile.ipynb",
+    "02_PhysicsNeMo/01_Projectile_PINN.ipynb",
+    "02_PhysicsNeMo/02_Poisson_FNO.ipynb",
+    "02_PhysicsNeMo/optional/FNO_Mode_Ablation.ipynb",
 )
+ACTIVE_NOTEBOOKS = tuple(ROOT / path for path in ACTIVE_NOTEBOOK_PATHS)
 
 OLD_PARTICIPANT_PATHS = (
     "02_Poisson_FNO_GH200.ipynb",
@@ -255,9 +262,12 @@ def check_start_here_gpu_guidance(check: Validation) -> None:
     )
     required_code = (
         "!nvidia-smi",
-        "EXPECTED_GPU_COUNT = 1",
+        'os.environ.get("KSC_EXPECTED_GPU_COUNT")',
+        'os.environ.get("SLURM_GPUS_ON_NODE")',
+        "EXPECTED_GPU_COUNT = configured_gpu_count or slurm_gpu_count",
         "GPU_COUNT_READY = visible_gpu_count == EXPECTED_GPU_COUNT",
-        "CUDA_TENSOR_READY = visible_gpu_count == EXPECTED_GPU_COUNT",
+        "visible_gpu_count in {1, 4}",
+        "CUDA_TENSOR_READY = GPU_COUNT_READY",
         "NVIDIA_SMI_COMMAND_READY = query.returncode == 0",
         "len(majors) == visible_gpu_count",
         "and bool(majors)",
@@ -265,17 +275,17 @@ def check_start_here_gpu_guidance(check: Validation) -> None:
         "and NVIDIA_SMI_COMMAND_READY",
     )
     forbidden_code = (
-        "KSC_EXPECTED_GPU_COUNT",
         "MINIMUM_GPU_COUNT",
         "visible_gpu_count >=",
     )
     required_markdown = (
         "Jupyter 코드 셀에서 Linux 명령을 실행할 때는 명령 앞에 `!`",
         "로그인 터미널에서는 느낌표 없이 `nvidia-smi`",
-        "GPU가 정확히 한 개 보여야",
-        "Slurm이 동적으로 배정한 GH200 한 개",
+        "참가자 세션에는 GPU 한 개가 배정",
+        "강사 세션에는 여러 GPU가 보일 수 있습니다",
+        "참가자용 한 개 또는 강사용 네 개",
         "`CUDA Version`",
-        "`NVIDIA driver 570.124.06`은 R570 계열",
+        "드라이버는 R570 이상",
         "실제 CUDA 텐서 연산까지 통과해야 최종 정상",
     )
     valid = (
@@ -285,7 +295,7 @@ def check_start_here_gpu_guidance(check: Validation) -> None:
     )
     check.require(
         valid,
-        "Start Here requires one Slurm-assigned GPU and explains nvidia-smi/R570 validation",
+        "Start Here validates the launcher/Slurm GPU allocation and explains nvidia-smi/R570 validation",
     )
 
 
@@ -413,10 +423,12 @@ def check_participant_payload_closure(check: Validation) -> None:
                 else:
                     raise FileNotFoundError(relative)
 
-            environment = os.environ.copy()
-            environment["PYTHONDONTWRITEBYTECODE"] = "1"
+            environment = {
+                "LC_ALL": "C",
+                "PYTHONDONTWRITEBYTECODE": "1",
+            }
             result = subprocess.run(
-                [sys.executable, str(ROOT / "tools/validate_participant_release.py"), str(staging)],
+                [sys.executable, "-I", "-B", str(PARTICIPANT_VALIDATOR), str(staging)],
                 cwd=str(ROOT),
                 env=environment,
                 stdin=subprocess.DEVNULL,
@@ -579,12 +591,34 @@ def check_operations(check: Validation) -> None:
         '"$actor_uid:644:1"',
         "( umask 022; set -o noclobber;",
         "flock -x -n 9",
+        "canonical_repo_url=https://github.com/yang926/KSC2026-GH200-PhysicsNeMo-Tutorial.git",
+        'trusted_tools_dir="${admin_root}/libexec"',
+        'stat -Lc \'%d:%i\' /dev/fd/9',
+        "git_safe --git-dir=\"$mirror_dir\" ls-tree -rlz --full-tree",
+        "max_course_entries=10000",
+        "max_course_blob_bytes=$((256 * 1024 * 1024))",
+        "max_course_total_bytes=$((2 * 1024 * 1024 * 1024))",
+        "merge-base --is-ancestor \"$active_commit\" \"$course_commit\"",
+        "site.env에는 KSC_COURSE_RELEASE 항목이 정확히 하나 있어야 합니다",
+        "새 강의 release를 중앙 설정에 활성화하지 못했습니다",
+        '--root "$validation_dir"',
+        '--participant-validator "$trusted_participant_validator"',
+        "--static-only",
+        '"$runtime_python" -I -B "$trusted_participant_validator" "$staging_dir"',
     )
     publisher_defects = [marker for marker in publisher_required if marker not in publisher]
     if 'source "$site_env"' in publisher:
         publisher_defects.append("runtime site.env is shell-sourced")
     if "KSC_COURSE_FROZEN_COMMIT" in publisher:
         publisher_defects.append("freeze state is read from runtime site.env")
+    for forbidden_execution in (
+        "python3 tools/validate_course.py",
+        '"${validation_dir}/tools/validate_participant_release.py"',
+    ):
+        if forbidden_execution in publisher:
+            publisher_defects.append(
+                f"fetched Git validator is executed: {forbidden_execution}"
+            )
     check.require(
         not publisher_defects,
         "course publisher enforces the rootless central-owner path, data-only site config, CLI freeze, and shared deployment lock"
@@ -616,7 +650,13 @@ def check_operations(check: Validation) -> None:
             '"$central_uid:644:1"',
             "flock -x -n 9",
             "CENTRAL_ENTRYPOINT_IMMUTABLE_CONTENT_MISMATCH",
-            'if [[ "$entrypoint_action" == INSTALL ]]',
+            'if (( admin_tools_only == 0 )) && [[ "$entrypoint_action" == INSTALL ]]',
+            '"$central_root/admin/libexec/validate_course.py"',
+            '"$central_root/admin/libexec/validate_participant_release.py"',
+            '"$central_root/admin/libexec/publish-course.sh"',
+            '"$central_root/admin/bin/refresh-course"',
+            "declare -a target_modes=(0755 0644 0755 0644 0600 0600 0700 0700)",
+            "SITE_ENV_COURSE_RELEASE_WOULD_ROLL_BACK",
         ),
     }
     atomic_runtime_text = {
@@ -632,6 +672,18 @@ def check_operations(check: Validation) -> None:
     participant_lock_test = operations / "admin/participant/tests/test-runtime-lock.py"
     if not participant_lock_test.is_file() or not os.access(participant_lock_test, os.X_OK):
         atomic_runtime_defects.append("executable runtime-lock test is missing")
+    trusted_validation_test = operations / "admin/participant/tests/test_trusted_course_validation.py"
+    if not trusted_validation_test.is_file() or not os.access(trusted_validation_test, os.X_OK):
+        atomic_runtime_defects.append("executable trusted-validation test is missing")
+    refresh_path = operations / "admin/refresh-course"
+    refresh = refresh_path.read_text(encoding="utf-8") if refresh_path.is_file() else ""
+    for marker in (
+        "/scratch/hackathon/ksc2026/admin/bin/refresh-course",
+        'publisher="$central_root/admin/libexec/publish-course.sh"',
+        "KSC_REFRESH_ERROR=NO_OPTIONS_ALLOWED",
+    ):
+        if marker not in refresh:
+            atomic_runtime_defects.append(f"owner refresh command: {marker}")
     check.require(
         not atomic_runtime_defects,
         "participant runtime holds a shared deployment lock across exec and keeps its stable entrypoint immutable"
@@ -1165,7 +1217,7 @@ def check_docker_context(check: Validation) -> None:
 def check_github_operations_suites(check: Validation) -> None:
     """Run the two local operations suites once when CI invokes this validator."""
 
-    if os.environ.get("GITHUB_ACTIONS") != "true":
+    if STATIC_ONLY or os.environ.get("GITHUB_ACTIONS") != "true":
         return
     suites = (
         (
@@ -1207,7 +1259,51 @@ def check_github_operations_suites(check: Validation) -> None:
         )
 
 
-def main() -> int:
+def parse_arguments(argv=None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="KSC 2026 course bundle static validation"
+    )
+    parser.add_argument(
+        "--root",
+        default=str(DEFAULT_ROOT),
+        help="course checkout/archive root to inspect",
+    )
+    parser.add_argument(
+        "--participant-validator",
+        help="trusted validate_participant_release.py path",
+    )
+    parser.add_argument(
+        "--static-only",
+        action="store_true",
+        help="never execute operation test suites from the inspected root",
+    )
+    return parser.parse_args(argv)
+
+
+def configure_paths(arguments: argparse.Namespace) -> None:
+    global ROOT, PARTICIPANT_VALIDATOR, STATIC_ONLY, ACTIVE_NOTEBOOKS
+
+    requested_root = Path(arguments.root)
+    if not requested_root.is_dir() or requested_root.is_symlink():
+        raise SystemExit(f"검증 대상이 안전한 폴더가 아닙니다: {requested_root}")
+    ROOT = requested_root.resolve()
+    ACTIVE_NOTEBOOKS = tuple(ROOT / path for path in ACTIVE_NOTEBOOK_PATHS)
+
+    requested_validator = Path(
+        arguments.participant_validator
+        if arguments.participant_validator
+        else ROOT / "tools/validate_participant_release.py"
+    )
+    if not requested_validator.is_file() or requested_validator.is_symlink():
+        raise SystemExit(
+            f"참가자 검증기가 안전한 regular file이 아닙니다: {requested_validator}"
+        )
+    PARTICIPANT_VALIDATOR = requested_validator.resolve()
+    STATIC_ONLY = bool(arguments.static_only)
+
+
+def main(argv=None) -> int:
+    configure_paths(parse_arguments(argv))
     check = Validation()
     check_required_files(check)
     check_course_scope(check)

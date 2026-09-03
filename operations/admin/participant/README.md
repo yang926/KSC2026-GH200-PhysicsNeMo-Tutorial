@@ -20,6 +20,7 @@ KSC 2026 행사 사용자는 계정별 launcher나 SIF를 설치하지 않습니
 
 ```text
 /scratch/hackathon/ksc2026/
+├── admin/bin/       # 중앙 owner용 refresh-course
 ├── bin/             # 공용 ksc2026 명령
 ├── config/          # site.env
 ├── images/          # 검증된 ARM64 SIF와 SHA-256
@@ -39,7 +40,7 @@ SIF는 중앙 한 벌만 두며 개인 폴더에 복사하지 않습니다.
 1. 중앙 owner 계정과 `/scratch/hackathon/ksc2026` 소유권
 2. 검증된 ARM64 SIF의 절대경로·크기·SHA-256
 3. KISTI가 확인한 로그인 호스트, Slurm `gpu` 파티션, GH200 GRES, Apptainer 경로와 24시간 제한
-4. GitHub `main`의 게시할 정확한 commit
+4. 최초 배포에서 게시할 GitHub `main`의 정확한 commit
 5. 저장소 밖 private `site.env`
 6. 시험에 사용할 PILOT 계정 한 개
 
@@ -66,7 +67,7 @@ mkdir -m 0700 -p "$KSC_PRIVATE"
 
 공용 root와 SIF를 확인하고, 저장소 밖의 `$KSC_PRIVATE/site.env`에 실제 사이트 값을 채웁니다. placeholder, 사용자별 매핑 또는 token을 넣지 않습니다.
 
-검증된 commit을 중앙 release에 게시한 뒤, 설치기를 먼저 dry-run합니다.
+검증된 commit을 중앙 release에 게시한 뒤, 설치기를 먼저 dry-run합니다. 최초 배포와 공용 런타임 갱신은 정확한 소스 commit에서 신뢰 검증 도구와 중앙 owner용 `refresh-course`까지 설치하는 작업입니다.
 
 ```bash
 "$KSC_REPO/operations/admin/participant/install-participants.sh" \
@@ -74,7 +75,7 @@ mkdir -m 0700 -p "$KSC_PRIVATE"
   --central-owner "$KSC_CENTRAL_OWNER"
 ```
 
-출력의 source commit, SIF SHA-256, 중앙 경로, 설치 파일, owner·mode와 `SLURM_SUBMISSIONS=0`, `SLURM_CANCELLATIONS=0`을 확인합니다. 예상과 모두 일치할 때만 같은 입력에 `--apply`를 추가합니다.
+출력의 SIF SHA-256, 중앙 경로, 설치 대상과 owner·mode를 확인합니다. 끝에 `KSC_INSTALL_MODE=DRY_RUN`, 변경 파일 수와 `KSC_INSTALL_COMPLETE=yes`가 표시되어야 합니다. 설치기는 Slurm Job을 제출하거나 취소하지 않으므로, 필요하면 설치 전후 `squeue` 결과가 같은지도 확인합니다. 예상과 모두 일치할 때만 같은 입력에 `--apply`를 추가합니다.
 
 ```bash
 "$KSC_REPO/operations/admin/participant/install-participants.sh" \
@@ -84,6 +85,20 @@ mkdir -m 0700 -p "$KSC_PRIVATE"
 ```
 
 이 단계는 중앙 런타임만 설치하며 개인 디렉터리를 미리 만들거나 Slurm Job을 제출하지 않습니다.
+
+## 이후 강의자료만 갱신
+
+노트북, README, 실습 코드, 강의 이미지만 바뀐 경우에는 설치기를 다시 실행하지 않습니다. GitHub `main`에 push한 뒤 PILOT 로그인 노드에서 중앙 owner가 다음 한 줄을 실행합니다.
+
+```bash
+/scratch/hackathon/ksc2026/admin/bin/refresh-course
+```
+
+신뢰 게시 도구가 아직 설치되지 않은 기존 환경에 이를 처음 추가할 때는 정확한 저장소 checkout에서 설치기를 `--admin-tools-only`로 실행합니다. 공용 Jupyter 런타임이 checkout과 다르면 이 모드는 아무 파일도 바꾸지 않고 중단합니다.
+
+GitHub push만으로는 중앙 게시본이 바뀌지 않습니다. 위 명령이 최신 `main` tip을 가져와 설치된 신뢰 도구로 검증하고, commit별 불변 release를 만든 뒤 중앙 설정을 원자적으로 전환합니다. 이 강의자료-only 갱신은 SIF, 공용 런타임, 활성 Slurm Job을 건드리지 않습니다.
+
+공용 런타임을 나중에 재설치할 때 private `site.env`의 강의 release 값이 예전 commit을 가리키면, 설치기는 `SITE_ENV_COURSE_RELEASE_WOULD_ROLL_BACK`으로 중단합니다. 이 경우 현재 중앙 `config/site.env`의 release 값을 private 입력에 반영한 뒤 다시 실행합니다. 오래된 private 입력이 강의자료를 이전 버전으로 돌려놓지 않습니다.
 
 ## 실제 검증 범위
 
@@ -118,6 +133,8 @@ PILOT 로그인 노드에서:
 ```
 
 재접속할 때는 공용 명령을 다시 실행해 현재 활성 세션의 SSH 명령과 주소를 다시 확인합니다.
+
+참가자 `--refresh`는 GitHub에서 직접 clone·pull하지 않습니다. 중앙 owner가 마지막으로 게시한 release를 새 개인 작업공간에 복사하며 기존 작업공간은 보존합니다.
 
 ## 상세 문서
 

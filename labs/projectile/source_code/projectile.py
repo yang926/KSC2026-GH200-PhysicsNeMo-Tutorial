@@ -33,19 +33,33 @@ from physicsnemo.sym.domain.inferencer import PointwiseInferencer
 from physicsnemo.sym.domain.validator import PointwiseValidator
 from physicsnemo.sym.key import Key
 from projectile_eqn import ProjectileEquation
-from physicsnemo.sym.utils.io import (
-    InferencerPlotter,
-    ValidatorPlotter,
-)
+from physicsnemo.sym.utils.io import ValidatorPlotter
 
 
 @physicsnemo.sym.main(config_path="conf", config_name="config")
 def run(cfg: PhysicsNeMoConfig) -> None:
     """Train the KSC projectile PINN and write validation artifacts."""
 
-    gravity = 9.81
-    initial_speed = 40.0
-    launch_angle = np.pi / 3
+    gravity = float(cfg.custom.gravity)
+    initial_speed = float(cfg.custom.initial_speed)
+    launch_angle_deg = float(cfg.custom.launch_angle_deg)
+    train_time_end = float(cfg.custom.train_time_end)
+    inference_time_end = float(cfg.custom.inference_time_end)
+    if gravity <= 0.0:
+        raise ValueError("custom.gravity must be positive")
+    if initial_speed <= 0.0:
+        raise ValueError("custom.initial_speed must be positive")
+    if not 0.0 < launch_angle_deg < 90.0:
+        raise ValueError("custom.launch_angle_deg must be between 0 and 90")
+    if train_time_end <= 0.0:
+        raise ValueError("custom.train_time_end must be positive")
+    if inference_time_end < train_time_end:
+        raise ValueError(
+            "custom.inference_time_end must be greater than or equal to "
+            "custom.train_time_end"
+        )
+
+    launch_angle = np.deg2rad(launch_angle_deg)
     time = Symbol("t")
 
     # Equation node + neural-network node form one computational graph.
@@ -62,9 +76,18 @@ def run(cfg: PhysicsNeMoConfig) -> None:
     geo = Point1D(0)
     projectile_domain = Domain()
 
-    time_range = {time: (0.0, 5.0)}
+    time_range = {time: (0.0, train_time_end)}
     velocity_x = initial_speed * np.cos(launch_angle)
     velocity_y = initial_speed * np.sin(launch_angle)
+
+    print("=" * 72)
+    print("KSC 발사체 PINN 실험값")
+    print(f"초기속도: {initial_speed:.2f} m/s")
+    print(f"발사각: {launch_angle_deg:.2f} deg")
+    print(f"중력가속도 크기: {gravity:.4f} m/s^2")
+    print(f"학습/검증 시간: 0 <= t < {train_time_end:.2f} s")
+    print(f"추론 시간: 0 <= t < {inference_time_end:.2f} s")
+    print("=" * 72)
 
     # Four initial conditions are required for two second-order ODEs.
     initial_condition = PointwiseBoundaryConstraint(
@@ -94,7 +117,7 @@ def run(cfg: PhysicsNeMoConfig) -> None:
 
 
     # Setup validator
-    time_validation = np.arange(0.0, 5.0, 0.01)[:, None]
+    time_validation = np.arange(0.0, train_time_end, 0.01)[:, None]
     x_validation = velocity_x * time_validation
     y_validation = (
         velocity_y * time_validation
@@ -110,15 +133,14 @@ def run(cfg: PhysicsNeMoConfig) -> None:
     )
     projectile_domain.add_validator(validator)
 
-    # 5-8 s is extrapolation. After ground impact (~7.06 s), this ODE omits
-    # collision physics and continues the mathematical trajectory below y=0.
-    time_inference = np.arange(0.0, 8.0, 0.001)[:, None]
+    # Times after train_time_end are extrapolation. This ODE omits collision
+    # physics and continues the mathematical trajectory below y=0 after impact.
+    time_inference = np.arange(0.0, inference_time_end, 0.001)[:, None]
     grid_inference = PointwiseInferencer(
         nodes=nodes,
         invar={"t": time_inference},
         output_names=["x", "y"],
         batch_size=128,
-        plotter=InferencerPlotter(),
     )
     projectile_domain.add_inferencer(grid_inference, "inferencer_data")
 

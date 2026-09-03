@@ -70,6 +70,7 @@ custom:
   profile: gh200
   experiment_label: gh200_main
   random_seed: 2026
+  test_example_index: 0
   train_file: datasets/Poisson_Fourier_GH200/train.hdf5
   validation_file: datasets/Poisson_Fourier_GH200/val.hdf5
   test_file: datasets/Poisson_Fourier_GH200/test.hdf5

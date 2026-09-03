@@ -17,6 +17,13 @@
 
 별도 계정 분류나 고정 계산 노드표는 없습니다.
 
+운영 작업은 두 가지로 구분합니다.
+
+- **강의자료-only 갱신:** GitHub `main`에 push한 뒤 설치된 `/scratch/hackathon/ksc2026/admin/bin/refresh-course`를 한 번 실행합니다. SIF·공용 런타임·활성 Job은 바꾸지 않습니다.
+- **신뢰 도구·공용 런타임 갱신:** 정확한 Git commit을 다시 검증하고 설치기를 dry-run·갱신합니다. 이 경로에서는 실행 중인 사용자 Job에 대한 영향을 먼저 확인합니다.
+
+GitHub push만으로 서버가 자동 변경되지는 않습니다. 중앙 owner의 명시적인 게시 명령이 있어야 새 commit이 중앙 release로 활성화됩니다.
+
 ## 권한 모델
 
 - 중앙 owner만 공용 root의 런처·설정·release를 갱신합니다.
@@ -29,6 +36,9 @@
 
 ```text
 /scratch/hackathon/ksc2026/
+├── admin/
+│   └── bin/
+│       └── refresh-course
 ├── bin/
 │   └── ksc2026
 ├── config/
@@ -88,7 +98,9 @@ squeue --noheader --format='%A|%u|%T|%N|%j'
 
 공용 런타임을 갱신하기 전에 관련 활성 Job이 있는지 확인합니다. 실행 중인 사용자 Job을 설치기가 자동 종료하게 해서는 안 됩니다.
 
-## 2. 저장소 상태와 변경 범위 확인
+## 2. 신뢰 도구·공용 런타임 갱신 시 저장소 확인
+
+이 절은 중앙에 설치된 검증 도구나 공용 런타임 코드를 바꿀 때만 수행합니다. 노트북·README·실습 코드·강의 이미지만 바뀐 경우에는 [9. 강의자료만 갱신](#9-강의자료만-갱신)을 따릅니다.
 
 ```bash
 git -C "$KSC_REPO" status --short --branch
@@ -148,6 +160,8 @@ stat -c '%U:%G %a %s %y %n' "$KSC_SIF" "${KSC_SIF}.sha256"
 
 사용자별 매핑, 고정 계산 노드, 고정 GPU, OTP, 비밀번호와 token을 넣지 않습니다. 실제 로그인 호스트와 IP 주소는 private 설정과 서버 출력에만 둡니다.
 
+private `site.env`는 실제 사이트 값의 설치 입력이지 현재 게시된 강의 release의 최신 대장이 아닙니다. 강의자료를 여러 번 게시한 뒤 예전 private `site.env`로 공용 런타임을 재설치하면, 설치기는 `SITE_ENV_COURSE_RELEASE_WOULD_ROLL_BACK`으로 중단하고 중앙 설정을 바꾸지 않습니다. 현재 중앙 `config/site.env`의 release 값을 private 입력에 반영한 뒤 다시 실행합니다.
+
 ## 6. 공용 런타임 dry-run
 
 ```bash
@@ -163,7 +177,7 @@ stat -c '%U:%G %a %s %y %n' "$KSC_SIF" "${KSC_SIF}.sha256"
 - 설치 대상이 `$KSC_SHARED` 아래로 제한
 - Slurm 계약이 `gpu` 파티션·GH200 한 개·동적 노드 배정
 - 완성형 SSH 명령에 필요한 로그인 호스트가 private 설정에서 제공됨
-- `SLURM_SUBMISSIONS=0`, `SLURM_CANCELLATIONS=0`
+- 설치 전후 `squeue` 결과가 같고 새 `ksc26-jlab-*` Job이 생기거나 취소되지 않음
 
 dry-run이 실제 파일이나 Slurm 상태를 바꾸면 실패입니다.
 
@@ -182,11 +196,13 @@ dry-run이 실제 파일이나 Slurm 상태를 바꾸면 실패입니다.
 
 ```bash
 stat -c '%U:%G %a %F %n' \
+  "$KSC_SHARED/admin/bin/refresh-course" \
   "$KSC_SHARED/bin/ksc2026" \
   "$KSC_SHARED/config/site.env" \
   "$KSC_SHARED/slurm/jupyter-job.sh"
 
 test -x "$KSC_SHARED/bin/ksc2026"
+test -x "$KSC_SHARED/admin/bin/refresh-course"
 test -r "$KSC_SHARED/config/site.env"
 sha256sum --check --strict "${KSC_SIF}.sha256"
 ```
@@ -223,19 +239,22 @@ sha256sum --check --strict "${KSC_SIF}.sha256"
 
 ## 9. 강의자료만 갱신
 
-검증된 변경을 GitHub `main`에 push하고 중앙 owner 저장소를 fast-forward한 뒤 새 commit을 게시합니다.
+노트북, README, 실습 코드, 강의 이미지만 바뀐 경우에는 SIF나 공용 런타임을 다시 설치하지 않습니다. 검증된 변경을 GitHub `main`에 push한 뒤, PILOT 로그인 노드에서 중앙 owner가 설치된 명령을 한 번 실행합니다.
 
 ```bash
-KSC_COMMIT="$(git -C "$KSC_REPO" rev-parse HEAD)"
-
-"$KSC_REPO/operations/admin/publish-course.sh" \
-  --root "$KSC_SHARED" \
-  --site-env "$KSC_SITE_ENV" \
-  --ref main \
-  --commit "$KSC_COMMIT"
+/scratch/hackathon/ksc2026/admin/bin/refresh-course
 ```
 
-사용자는 활성 Job을 종료한 뒤 새 작업공간을 준비합니다.
+이 명령은 다음 작업을 한 번에 수행합니다.
+
+1. 허용된 GitHub 저장소의 `main` 최신 tip을 가져옵니다.
+2. 가져온 트리를 실행 코드가 아닌 검증 대상 데이터로 취급하고, 최초 배포 때 설치한 신뢰 검증 도구로 검사합니다.
+3. 검증을 통과한 40자리 commit만 새 읽기 전용 `course-releases/<commit>/`으로 게시합니다.
+4. 중앙 `config/site.env`가 새 release를 가리키도록 원자적으로 전환합니다.
+
+명령이 끝나면 출력된 commit과 활성 release 경로가 GitHub `main`의 기대 commit과 일치하는지 확인합니다. 검증이 실패하면 이전 중앙 release를 그대로 유지하고 원인을 해결한 뒤 다시 실행합니다. GitHub push만으로는 중앙 게시본이 바뀌지 않습니다.
+
+이 절차는 중앙 SIF, 공용 `ksc2026` 런타임, 실행 중인 Slurm Job과 기존 개인 작업공간을 변경하지 않습니다. 새 게시본을 사용할 참가자만 현재 파일을 저장하고 자기 Job을 종료한 뒤 다음 명령으로 새 작업공간을 준비합니다.
 
 ```bash
 /scratch/hackathon/ksc2026/bin/ksc2026 --refresh

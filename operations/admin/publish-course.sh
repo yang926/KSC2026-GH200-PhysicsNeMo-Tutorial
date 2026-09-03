@@ -9,6 +9,19 @@ set -f
 umask 077
 export LC_ALL=C
 
+# Course content comes from GitHub, but process configuration must not.  Clear
+# interpreter/archive/Git hooks before any external tool is selected.  The
+# central owner may still use the site network's ordinary HTTPS proxy settings.
+unset BASH_ENV ENV CDPATH PYTHONPATH PYTHONHOME PYTHONSTARTUP \
+    TAR_OPTIONS GZIP BZIP BZIP2 XZ_OPT LD_PRELOAD || true
+for environment_name in ${!GIT_@}; do
+    unset "$environment_name"
+done
+export GIT_CONFIG_GLOBAL=/dev/null
+export GIT_CONFIG_NOSYSTEM=1
+export GIT_TERMINAL_PROMPT=0
+export PYTHONDONTWRITEBYTECODE=1
+
 usage() {
     cat <<'EOF'
 사용법: publish-course.sh [--root /scratch/hackathon/ksc2026] [--site-env /secure/operator/site.env] [--ref main] [--commit 40자리_SHA] [--frozen-commit 40자리_SHA]
@@ -28,6 +41,7 @@ die() {
 
 canonical_parent=/scratch/hackathon
 canonical_root=/scratch/hackathon/ksc2026
+canonical_repo_url=https://github.com/yang926/KSC2026-GH200-PhysicsNeMo-Tutorial.git
 install_root=$canonical_root
 site_env_override=""
 ref_override=""
@@ -79,6 +93,15 @@ for required_command in awk bash chmod dirname git grep id install mv tar python
 done
 stat -c '%u:%g:%a' / >/dev/null 2>&1 || die "GNU stat이 필요합니다"
 readlink -f / >/dev/null 2>&1 || die "GNU readlink가 필요합니다"
+
+git_safe() {
+    command git \
+        -c protocol.file.allow=never \
+        -c protocol.ext.allow=never \
+        -c fetch.fsckObjects=true \
+        -c transfer.fsckObjects=true \
+        "$@"
+}
 
 actor_uid="$(id -u)"
 [[ "$actor_uid" =~ ^[0-9]+$ && "$actor_uid" != 0 ]] ||
@@ -142,8 +165,8 @@ if [[ -n "${site[KSC_SIF_SHA256]:-}" && -n "${site[KSC_IMAGE_SHA256]:-}" ]]; the
         die "site.env의 SIF SHA256 두 값이 서로 다릅니다"
 fi
 
-[[ "$repo_url" =~ ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(\.git)?$ ]] ||
-    die "공개 GitHub HTTPS 저장소만 사용할 수 있습니다: $repo_url"
+[[ "$repo_url" == "$canonical_repo_url" ]] ||
+    die "강의자료 저장소가 승인된 공개 GitHub 저장소와 다릅니다: $repo_url"
 [[ "$course_ref" =~ ^[A-Za-z0-9._/-]+$ && "$course_ref" != -* &&
    "${course_ref: -1}" != "/" && "$course_ref" != *..* && "$course_ref" != *"//"* ]] ||
     die "안전한 GitHub branch 이름이 아닙니다: $course_ref"
@@ -151,6 +174,8 @@ fi
     die "site.env에 실제 SIF의 KSC_SIF_SHA256 64자리 값이 필요합니다"
 [[ "$runtime_compatibility" =~ ^[A-Za-z0-9._-]+$ ]] ||
     die "runtime compatibility 값이 올바르지 않습니다"
+[[ -n "${site[KSC_COURSE_RELEASE]:-}" ]] ||
+    die "site.env에 KSC_COURSE_RELEASE 항목과 현재 release 경로가 필요합니다"
 
 [[ "$release_root" == "${install_root}/course-releases" ]] ||
     die "강의 release root는 확인된 고정 경로여야 합니다: $release_root"
@@ -171,6 +196,51 @@ require_owned_directory() {
 }
 require_owned_directory "$admin_root" "관리"
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+if [[ "$(readlink -f "$script_dir")" == "${admin_root}/libexec" ]]; then
+    trusted_tools_dir="${admin_root}/libexec"
+else
+    trusted_tools_dir="$(cd -- "$script_dir/../../tools" && pwd -P)"
+fi
+trusted_course_validator="${trusted_tools_dir}/validate_course.py"
+trusted_participant_validator="${trusted_tools_dir}/validate_participant_release.py"
+
+require_trusted_validator() {
+    local path=$1 label=$2 mode
+    [[ -f "$path" && ! -L "$path" && -r "$path" ]] ||
+        die "$label 검증기가 안전한 regular file이 아닙니다: $path"
+    [[ "$(readlink -f "$path")" == "$path" ]] ||
+        die "$label 검증기 경로가 canonical 경로가 아닙니다: $path"
+    mode="$(stat -c '%a' "$path")"
+    [[ "$(stat -c '%u:%h' "$path")" == "$actor_uid:1" && "$mode" =~ ^[0-7]+$ ]] ||
+        die "$label 검증기 owner 또는 link count가 안전하지 않습니다: $path"
+    (( (8#$mode & 0022) == 0 )) ||
+        die "$label 검증기를 group/other가 수정할 수 있습니다: $path"
+}
+require_trusted_validator "$trusted_course_validator" "전체 강의"
+require_trusted_validator "$trusted_participant_validator" "참가자 release"
+
+runtime_python="$(command -v python3)"
+if ! "$runtime_python" -I -B -c \
+    'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)' \
+    >/dev/null 2>&1; then
+    if ! type module >/dev/null 2>&1; then
+        for init_script in /etc/profile.d/modules.sh /usr/share/Modules/init/bash /etc/profile; do
+            if [[ -r "$init_script" ]]; then
+                # shellcheck disable=SC1090
+                source "$init_script"
+                type module >/dev/null 2>&1 && break
+            fi
+        done
+    fi
+    type module >/dev/null 2>&1 || die "Python 3.10+ module 환경을 찾을 수 없습니다"
+    module load cray-python/3.11.7 || die "cray-python/3.11.7 module을 불러오지 못했습니다"
+    runtime_python="$(command -v python3)"
+fi
+"$runtime_python" -I -B -c \
+    'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)' ||
+    die "Python 3.10 이상이 필요합니다"
+
 deployment_lock="${admin_root}/deployment.lock"
 if [[ ! -e "$deployment_lock" && ! -L "$deployment_lock" ]]; then
     # noclobber makes first creation atomic when two owner processes start at once.
@@ -183,6 +253,9 @@ fi
     die "중앙 배포 lock이 안전하지 않습니다: $deployment_lock"
 exec 9<>"$deployment_lock"
 flock -x -n 9 || die "다른 중앙 배포 또는 강의자료 게시 작업이 실행 중입니다"
+[[ "$(stat -Lc '%d:%i' /dev/fd/9)" == "$(stat -Lc '%d:%i' "$deployment_lock")" &&
+   "$(stat -c '%u:%a:%h' "$deployment_lock")" == "$actor_uid:644:1" ]] ||
+    die "잠근 중앙 배포 lock과 경로가 더 이상 일치하지 않습니다"
 require_owned_directory "$release_root" "강의 release"
 
 temporary_parent=""
@@ -196,6 +269,7 @@ cleanup() {
     set +e
     [[ -z "$current_tmp" || ! -L "$current_tmp" ]] || unlink "$current_tmp"
     if [[ -n "$staging_dir" && -d "$staging_dir" && "$staging_dir" == "${release_root}/.staging."* ]]; then
+        chmod -R u+rwX "$staging_dir" 2>/dev/null || true
         rm -rf -- "$staging_dir"
     fi
     if [[ -n "$validation_dir" && -d "$validation_dir" && "$validation_dir" == "${admin_root}/.course-validation."* ]]; then
@@ -217,7 +291,7 @@ if [[ ! -d "$mirror_dir" ]]; then
     [[ ! -e "$mirror_dir" && ! -L "$mirror_dir" ]] ||
         die "기존 mirror 경로가 안전하지 않습니다: $mirror_dir"
     temporary_parent="$(mktemp -d "${admin_root}/.course-mirror.XXXXXX")"
-    git clone --mirror "$repo_url" "${temporary_parent}/repository.git"
+    git_safe clone --mirror "$repo_url" "${temporary_parent}/repository.git"
     mv "${temporary_parent}/repository.git" "$mirror_dir"
     rmdir "$temporary_parent"
     temporary_parent=""
@@ -229,20 +303,20 @@ else
     [[ "$mirror_mode" =~ ^[0-7]+$ ]] && (( (8#$mirror_mode & 0022) == 0 )) ||
         die "기존 mirror를 group/other가 수정할 수 있습니다: $mirror_dir"
     [[ -f "${mirror_dir}/HEAD" ]] || die "기존 mirror가 Git 저장소가 아닙니다: $mirror_dir"
-    configured_remote="$(git --git-dir="$mirror_dir" remote get-url origin)"
+    configured_remote="$(git_safe --git-dir="$mirror_dir" remote get-url origin)"
     [[ "$configured_remote" == "$repo_url" ]] ||
         die "기존 mirror origin이 설정과 다릅니다: $configured_remote"
 fi
 
-git --git-dir="$mirror_dir" fetch --prune origin \
+git_safe --git-dir="$mirror_dir" fetch --prune origin \
     "+refs/heads/${course_ref}:refs/remotes/origin/${course_ref}"
-branch_tip="$(git --git-dir="$mirror_dir" rev-parse --verify "refs/remotes/origin/${course_ref}^{commit}")"
+branch_tip="$(git_safe --git-dir="$mirror_dir" rev-parse --verify "refs/remotes/origin/${course_ref}^{commit}")"
 if [[ -n "$commit_override" ]]; then
-    git --git-dir="$mirror_dir" cat-file -e "${commit_override}^{commit}" 2>/dev/null ||
+    git_safe --git-dir="$mirror_dir" cat-file -e "${commit_override}^{commit}" 2>/dev/null ||
         die "지정한 commit을 mirror에서 찾을 수 없습니다: $commit_override"
-    git --git-dir="$mirror_dir" merge-base --is-ancestor "$commit_override" "$branch_tip" ||
+    git_safe --git-dir="$mirror_dir" merge-base --is-ancestor "$commit_override" "$branch_tip" ||
         die "지정한 commit은 origin/$course_ref 이력에 포함되지 않습니다"
-    course_commit="$(git --git-dir="$mirror_dir" rev-parse "${commit_override}^{commit}")"
+    course_commit="$(git_safe --git-dir="$mirror_dir" rev-parse "${commit_override}^{commit}")"
 else
     course_commit="$branch_tip"
 fi
@@ -250,22 +324,112 @@ fi
 [[ -z "$frozen_commit" || "$course_commit" == "$frozen_commit" ]] ||
     die "행사 freeze commit과 다릅니다: requested=$course_commit frozen=$frozen_commit"
 
+active_release="${site[KSC_COURSE_RELEASE]}"
+[[ "$active_release" == "${release_root}/"* ]] ||
+    die "현재 활성 release가 고정 release root 밖에 있습니다: $active_release"
+if [[ -e "$active_release" || -L "$active_release" ]]; then
+    [[ -d "$active_release" && ! -L "$active_release" ]] ||
+        die "현재 활성 release가 안전한 일반 디렉터리가 아닙니다: $active_release"
+elif [[ "$active_release" != "${release_root}/REPLACE_WITH_VERIFIED_COMMIT" ]]; then
+    die "현재 활성 release 경로가 존재하지 않습니다: $active_release"
+fi
+if [[ -d "$active_release" && ! -L "$active_release" ]]; then
+    active_commit="$(tr -d '\r\n' <"${active_release}/.ksc2026-course-revision" 2>/dev/null || true)"
+    [[ "$active_commit" =~ ^[a-f0-9]{40}$ ]] ||
+        die "현재 활성 release의 commit을 확인할 수 없습니다: $active_release"
+    [[ "$active_release" == "${release_root}/${active_commit}" &&
+       "$(readlink -f "$active_release")" == "$active_release" ]] ||
+        die "현재 활성 release 경로와 commit이 정확히 일치하지 않습니다: $active_release"
+    [[ "$(stat -c '%u' "$active_release")" == "$actor_uid" ]] ||
+        die "현재 활성 release가 중앙 owner 소유가 아닙니다: $active_release"
+    git_safe --git-dir="$mirror_dir" cat-file -e "${active_commit}^{commit}" 2>/dev/null ||
+        die "현재 활성 commit이 승인된 저장소 mirror에 없습니다: $active_commit"
+    git_safe --git-dir="$mirror_dir" merge-base --is-ancestor "$active_commit" "$course_commit" ||
+        die "현재 활성 commit에서 새 commit으로 fast-forward할 수 없습니다: current=$active_commit requested=$course_commit"
+fi
+
+# Reject links, gitlinks, special modes, path traversal, control characters and
+# unexpectedly large trees before an untrusted Git tree is extracted or read by
+# the validators.  The limits are deliberately far above the current course
+# payload while still bounding scratch and memory use after a compromised push.
+max_course_entries=10000
+max_course_blob_bytes=$((256 * 1024 * 1024))
+max_course_total_bytes=$((2 * 1024 * 1024 * 1024))
+git_safe --git-dir="$mirror_dir" ls-tree -rlz --full-tree "$course_commit" |
+    "$runtime_python" -I -B -c '
+import sys
+
+max_entries = int(sys.argv[1])
+max_blob_bytes = int(sys.argv[2])
+max_total_bytes = int(sys.argv[3])
+entry_count = 0
+total_bytes = 0
+pending = b""
+
+def inspect(record):
+    global entry_count, total_bytes
+    if not record:
+        return
+    try:
+        metadata, path = record.split(b"\t", 1)
+        mode, kind, _object_id, size_text = metadata.split()
+        decoded = path.decode("utf-8", "strict")
+    except (ValueError, UnicodeDecodeError):
+        raise SystemExit("Git tree entry 형식 또는 UTF-8 경로가 올바르지 않습니다")
+    parts = decoded.split("/")
+    if mode not in (b"100644", b"100755") or kind != b"blob":
+        raise SystemExit("symlink, gitlink 또는 특수 Git mode는 허용하지 않습니다: " + decoded)
+    try:
+        blob_bytes = int(size_text)
+    except ValueError:
+        raise SystemExit("Git blob 크기를 확인할 수 없습니다: " + decoded)
+    entry_count += 1
+    total_bytes += blob_bytes
+    if entry_count > max_entries:
+        raise SystemExit(f"Git tree 파일 수 제한을 초과했습니다: {entry_count} > {max_entries}")
+    if blob_bytes > max_blob_bytes:
+        raise SystemExit(f"Git blob 크기 제한을 초과했습니다: {decoded}")
+    if total_bytes > max_total_bytes:
+        raise SystemExit(f"Git tree 전체 크기 제한을 초과했습니다: {total_bytes} > {max_total_bytes}")
+    if (decoded.startswith("/") or "\\" in decoded or
+            any(part in ("", ".", "..") for part in parts) or
+            any(ord(character) < 32 or ord(character) == 127 for character in decoded)):
+        raise SystemExit("안전하지 않은 Git 경로입니다: " + repr(decoded))
+
+while True:
+    chunk = sys.stdin.buffer.read(65536)
+    if not chunk:
+        break
+    pending += chunk
+    while b"\0" in pending:
+        record, pending = pending.split(b"\0", 1)
+        inspect(record)
+    if len(pending) > 1024 * 1024:
+        raise SystemExit("Git tree record 길이 제한을 초과했습니다")
+if pending:
+    raise SystemExit("Git tree 출력이 NUL 문자로 끝나지 않았습니다")
+' "$max_course_entries" "$max_course_blob_bytes" "$max_course_total_bytes" ||
+    die "게시 전 Git tree 안전성 검사에 실패했습니다"
+
 release_dir="${release_root}/${course_commit}"
 
 verify_release() {
     local directory="$1"
+    local expected_commit="${2:-$course_commit}"
     local revision compatibility repository compatible count_expected count_actual
     [[ -d "$directory" && ! -L "$directory" ]] || return 1
     revision="$(tr -d '\r\n' <"${directory}/.ksc2026-course-revision" 2>/dev/null || true)"
     compatibility="$(tr -d '\r\n' <"${directory}/.ksc2026-runtime-compatibility" 2>/dev/null || true)"
     repository="$(tr -d '\r\n' <"${directory}/.ksc2026-course-repository" 2>/dev/null || true)"
     compatible="$(tr -d '\r\n' <"${directory}/.ksc2026-compatible-sif-sha256" 2>/dev/null || true)"
-    [[ "$revision" == "$course_commit" && "$compatibility" == "$runtime_compatibility" &&
+    [[ "$revision" == "$expected_commit" && "$compatibility" == "$runtime_compatibility" &&
        "$repository" == "$repo_url" && "$compatible" == "$site_sif_sha" ]] || return 1
     [[ -f "${directory}/.ksc2026-payload.sha256" && ! -L "${directory}/.ksc2026-payload.sha256" ]] || return 1
     (cd "$directory" && sha256sum --check --strict .ksc2026-payload.sha256 >/dev/null) || return 1
     ! find "$directory" -type l -print -quit | grep -q . || return 1
-    ! find "$directory" -perm /022 -print -quit | grep -q . || return 1
+    # A release is immutable even to its owner.  Any write bit means the
+    # payload can change after its manifest was verified.
+    ! find "$directory" -perm /222 -print -quit | grep -q . || return 1
     ! find "$directory" -type d ! -perm -0555 -print -quit | grep -q . || return 1
     ! find "$directory" -type f ! -perm -0444 -print -quit | grep -q . || return 1
     count_expected="$(wc -l <"${directory}/.ksc2026-payload.sha256" | tr -d ' ')"
@@ -273,20 +437,31 @@ verify_release() {
     [[ "$count_actual" == "$((10#$count_expected + 5))" ]] || return 1
 }
 
+if [[ -d "$active_release" && ! -L "$active_release" ]]; then
+    verify_release "$active_release" "$active_commit" ||
+        die "현재 활성 release의 내용·권한·SHA256 manifest가 계약과 다릅니다: $active_release"
+fi
+
 if [[ -e "$release_dir" ]]; then
     verify_release "$release_dir" ||
         die "기존 release의 내용·권한·SHA256 manifest가 계약과 다릅니다: $release_dir"
     printf '이미 검증된 immutable release를 재사용합니다: %s\n' "$course_commit"
 else
     validation_dir="$(mktemp -d "${admin_root}/.course-validation.XXXXXX")"
-    git --git-dir="$mirror_dir" archive --format=tar "$course_commit" | tar -xf - -C "$validation_dir"
-    (
-        cd "$validation_dir"
-        while IFS= read -r script; do bash -n "$script"; done < <(find operations container -type f -name '*.sh' -o -type f -name 'ksc2026-start' -o -type f -name 'start-jupyter' -o -type f -name 'stop-jupyter' -o -type f -name 'preflight-gh200')
-        python3 tools/validate_course.py
+    git_safe --git-dir="$mirror_dir" archive --format=tar "$course_commit" | tar -xf - -C "$validation_dir"
+    while IFS= read -r script; do
+        bash --noprofile --norc -n "$script"
+    done < <(
+        find "$validation_dir/operations" "$validation_dir/container" -type f \
+            \( -name '*.sh' -o -name 'ksc2026-start' -o -name 'start-jupyter' \
+               -o -name 'stop-jupyter' -o -name 'preflight-gh200' \)
     )
+    "$runtime_python" -I -B "$trusted_course_validator" \
+        --root "$validation_dir" \
+        --participant-validator "$trusted_participant_validator" \
+        --static-only
 
-    mapfile -t manifest_lines < <(python3 - "${validation_dir}/course-release.json" <<'PY'
+    mapfile -t manifest_lines < <("$runtime_python" -I -B - "${validation_dir}/course-release.json" <<'PY'
 import json
 import re
 import sys
@@ -340,9 +515,9 @@ PY
         die "강의자료가 실제 사이트 SIF SHA256을 허용하지 않습니다: $site_sif_sha"
 
     staging_dir="$(mktemp -d "${release_root}/.staging.XXXXXX")"
-    git --git-dir="$mirror_dir" archive --format=tar "$course_commit" -- "${participant_paths[@]}" |
+    git_safe --git-dir="$mirror_dir" archive --format=tar "$course_commit" -- "${participant_paths[@]}" |
         tar -xf - -C "$staging_dir"
-    python3 "${validation_dir}/tools/validate_participant_release.py" "$staging_dir"
+    "$runtime_python" -I -B "$trusted_participant_validator" "$staging_dir"
 
     payload_manifest_tmp="$(mktemp "${admin_root}/.payload-sha256.XXXXXX")"
     (
@@ -382,9 +557,9 @@ current_tmp=""
 course_release_activated=0
 course_release_key_count="$(grep -c '^KSC_COURSE_RELEASE=' "$site_env" || true)"
 [[ "$course_release_key_count" =~ ^[0-9]+$ ]] || die "KSC_COURSE_RELEASE 항목 수를 확인할 수 없습니다"
-if (( course_release_key_count > 1 )); then
-    die "site.env의 KSC_COURSE_RELEASE 항목이 중복됩니다"
-elif (( course_release_key_count == 1 )); then
+[[ "$course_release_key_count" == 1 ]] ||
+    die "site.env에는 KSC_COURSE_RELEASE 항목이 정확히 하나 있어야 합니다"
+if (( course_release_key_count == 1 )); then
     site_dir="$(dirname -- "$site_env")"
     [[ -d "$site_dir" && ! -L "$site_dir" ]] || die "site.env 폴더가 안전하지 않습니다: $site_dir"
     site_dir_mode="$(stat -c '%a' "$site_dir")"
@@ -405,6 +580,8 @@ elif (( course_release_key_count == 1 )); then
         die "site.env 강의 release 갱신 후 readback에 실패했습니다"
     course_release_activated=1
 fi
+[[ "$course_release_activated" == 1 ]] ||
+    die "새 강의 release를 중앙 설정에 활성화하지 못했습니다"
 
 printf 'KSC2026_COURSE_PUBLISHED=1\n'
 printf 'KSC_COURSE_COMMIT=%s\n' "$course_commit"

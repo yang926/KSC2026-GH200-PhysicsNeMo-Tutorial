@@ -30,7 +30,7 @@
 - Job 최대 시간 `1-00:00:00`
 - Apptainer 절대경로
 - 검증된 ARM64 SIF 절대경로·크기·SHA-256
-- GitHub `main`의 게시할 정확한 40자리 commit
+- GitHub `main`의 최초 게시에 사용할 검증된 40자리 commit
 - 로그인 노드에서 계산 노드 Jupyter 포트로 접근 가능한 내부 네트워크 정책
 
 실제 로그인 호스트, IP 주소, 계정, OTP, 비밀번호, SSH 키와 Jupyter token은 공개 저장소에 넣지 않습니다.
@@ -97,7 +97,7 @@ mkdir -m 0700 -p "$KSC_PRIVATE"
 git clone https://github.com/yang926/KSC2026-GH200-PhysicsNeMo-Tutorial.git "$KSC_REPO"
 ```
 
-이미 있다면 먼저 변경 파일이 없는지 확인하고 fast-forward만 허용합니다.
+이미 있다면 먼저 변경 파일이 없는지 확인하고 fast-forward만 허용합니다. 최초 배포에서는 이 정확한 commit의 코드와 검증 도구를 함께 검토하고 신뢰 설치 소스로 사용합니다.
 
 ```bash
 git -C "$KSC_REPO" status --short --branch
@@ -167,7 +167,7 @@ install -m 0600 \
 
 ## 6. 정확한 Git commit 게시
 
-로그인 노드에서 검증한 정확한 commit을 읽기 전용 release로 게시합니다.
+로그인 노드에서 검증한 정확한 commit을 읽기 전용 release로 게시합니다. 최초 배포에서는 검토한 이 commit으로 중앙 owner용 갱신 명령과 신뢰 검증 도구도 설치합니다. 이후 일반 강의자료 갱신에서는 GitHub에서 새로 가져온 트리의 스크립트를 검증 도구로 실행하지 않습니다.
 
 ```bash
 "$KSC_REPO/operations/admin/publish-course.sh" \
@@ -198,15 +198,15 @@ test -f "$KSC_SHARED/course-releases/$KSC_COMMIT/README.md"
   --central-owner "$KSC_CENTRAL_OWNER"
 ```
 
-다음을 확인합니다.
+다음을 확인합니다. 설치기는 실제 Slurm Job을 제출하거나 취소하지 않으므로, 그 사실은 출력 변수보다 `squeue`의 전후 상태가 같다는 방식으로 확인합니다.
 
-- source가 예상한 `$KSC_COMMIT`
 - SIF 경로·SHA-256이 검증값과 일치
 - Slurm 파티션이 `gpu`, GRES가 GH200 한 개
 - 노드 고정 또는 제외 옵션이 없음
 - 설치 대상이 `$KSC_SHARED` 아래로 제한
 - 실제 로그인 호스트가 공개 코드가 아니라 private 설정에서 제공됨
-- `SLURM_SUBMISSIONS=0`, `SLURM_CANCELLATIONS=0`
+- 출력 끝에 `KSC_INSTALL_MODE=DRY_RUN`, `KSC_RUNTIME_CHANGES`, `KSC_ADMIN_TOOL_CHANGES`, `KSC_INSTALL_COMPLETE=yes`가 표시됨
+- 설치 전후 `squeue` 결과가 같고 새 `ksc26-jlab-*` Job이 생기거나 취소되지 않음
 
 모두 일치할 때만 같은 입력에 `--apply`를 추가합니다.
 
@@ -219,6 +219,8 @@ test -f "$KSC_SHARED/course-releases/$KSC_COMMIT/README.md"
 
 이 작업은 중앙 공용 런타임만 설치합니다. 개인 `/scratch/<계정>/ksc2026`을 미리 만들거나 SIF를 복사하거나 Slurm Job을 제출하지 않습니다.
 
+향후 강의자료를 갱신한 뒤 최초 배포 때 만든 private `site.env`를 다시 입력하면 그 안의 release 값이 예전 commit일 수 있습니다. 이때 설치기는 `SITE_ENV_COURSE_RELEASE_WOULD_ROLL_BACK`으로 중단하고 중앙 설정을 바꾸지 않습니다. 현재 중앙 `config/site.env`의 release 값을 private 입력에 반영한 뒤 다시 실행합니다.
+
 ## 8. 설치 readback
 
 설치가 끝나면 중앙 파일을 다시 읽습니다.
@@ -226,12 +228,14 @@ test -f "$KSC_SHARED/course-releases/$KSC_COMMIT/README.md"
 ```bash
 stat -c '%U:%G %a %F %n' \
   "$KSC_SHARED" \
+  "$KSC_SHARED/admin/bin/refresh-course" \
   "$KSC_SHARED/bin" \
   "$KSC_SHARED/bin/ksc2026" \
   "$KSC_SHARED/config/site.env" \
   "$KSC_SHARED/slurm/jupyter-job.sh"
 
 test -x "$KSC_SHARED/bin/ksc2026"
+test -x "$KSC_SHARED/admin/bin/refresh-course"
 test -r "$KSC_SHARED/config/site.env"
 sha256sum --check --strict "${KSC_SIF}.sha256"
 ```
@@ -264,15 +268,24 @@ sha256sum --check --strict "${KSC_SIF}.sha256"
 노트북, README, 실습 코드 또는 강의 이미지만 바뀌었을 때는 SIF와 공용 런타임을 다시 설치하지 않습니다.
 
 1. GitHub `main`에 검증된 변경을 push합니다.
-2. 중앙 owner 저장소를 fast-forward합니다.
-3. 새 commit을 `publish-course.sh`로 게시합니다.
-4. 활성 Job을 종료한 사용자가 다음 명령으로 새 작업공간을 준비합니다.
+2. PILOT 로그인 노드에서 중앙 owner가 다음 명령을 한 번 실행합니다.
+
+   ```bash
+   /scratch/hackathon/ksc2026/admin/bin/refresh-course
+   ```
+
+3. 출력된 commit과 중앙 release 경로가 GitHub `main`의 기대 commit과 일치하는지 확인합니다.
+4. 새 게시본을 사용할 참가자는 파일을 저장하고 활성 Job을 종료한 뒤 다음 명령으로 새 작업공간을 준비합니다.
 
 ```bash
 /scratch/hackathon/ksc2026/bin/ksc2026 --refresh
 ```
 
 기존 작업공간은 삭제하거나 덮어쓰지 않습니다.
+
+GitHub push만으로는 중앙 게시본이 바뀌지 않습니다. `refresh-course`는 GitHub `main`의 최신 tip을 설치된 신뢰 도구로 검증하고, commit별 불변 release를 만든 뒤 중앙 설정을 원자적으로 전환합니다. 참가자 `--refresh`는 GitHub에 직접 접속하지 않고 마지막 중앙 게시본을 복사합니다.
+
+이 강의자료-only 게시는 중앙 SIF, 공용 Jupyter 런타임, 실행 중인 Slurm Job과 기존 개인 작업공간을 변경하지 않습니다.
 
 ## 공개하거나 전송하지 않을 것
 
