@@ -254,6 +254,27 @@ sha256sum --check --strict "${KSC_SIF}.sha256"
 
 명령이 끝나면 출력된 commit과 활성 release 경로가 GitHub `main`의 기대 commit과 일치하는지 확인합니다. 검증이 실패하면 이전 중앙 release를 그대로 유지하고 원인을 해결한 뒤 다시 실행합니다. GitHub push만으로는 중앙 게시본이 바뀌지 않습니다.
 
+공개 저장소에서 민감정보 제거 등을 위해 Git 이력을 교체한 직후에는 기존
+활성 release의 commit과 새 `main`이 fast-forward 관계가 아닐 수 있습니다.
+이 경우 일반 `refresh-course`는 안전하게 중단됩니다. 중앙 owner가 현재
+활성 release의 40자리 commit과 새로 검증한 40자리 commit을 각각 확인한
+뒤에만 다음 세 값을 모두 고정해 일회성 전환을 수행합니다.
+
+```bash
+"$KSC_SHARED/admin/libexec/publish-course.sh" \
+  --root "$KSC_SHARED" \
+  --site-env "$KSC_SHARED/config/site.env" \
+  --ref main \
+  --commit "$KSC_NEW_COMMIT" \
+  --frozen-commit "$KSC_NEW_COMMIT" \
+  --migrate-from-commit "$KSC_CURRENT_COMMIT"
+```
+
+현재 활성 release가 `--migrate-from-commit`과 정확히 일치하지 않거나,
+목표 `main` tip을 `--commit`과 `--frozen-commit`에 동일하게 지정하지 않으면
+게시기는 변경 전에 중단합니다. 기존 release의 manifest·권한 검증도
+그대로 수행하며, SIF·공용 런타임·Job·개인 작업공간은 변경하지 않습니다.
+
 이 절차는 중앙 SIF, 공용 `ksc2026` 런타임, 실행 중인 Slurm Job과 기존 개인 작업공간을 변경하지 않습니다. 새 게시본을 사용할 참가자만 현재 파일을 저장하고 자기 Job을 종료한 뒤 다음 명령으로 새 작업공간을 준비합니다.
 
 ```bash

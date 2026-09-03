@@ -24,11 +24,14 @@ export PYTHONDONTWRITEBYTECODE=1
 
 usage() {
     cat <<'EOF'
-사용법: publish-course.sh [--root /scratch/hackathon/ksc2026] [--site-env /secure/operator/site.env] [--ref main] [--commit 40자리_SHA] [--frozen-commit 40자리_SHA]
+사용법: publish-course.sh [--root /scratch/hackathon/ksc2026] [--site-env /secure/operator/site.env] [--ref main] [--commit 40자리_SHA] [--frozen-commit 40자리_SHA] [--migrate-from-commit 40자리_현재_SHA]
 
 --commit을 지정하면 해당 commit이 --ref branch의 이력에 포함되는지도 확인합니다.
 --frozen-commit을 지정하면 요청 commit과 일치할 때만 게시합니다. 이 값은
 참가자 runtime site.env에 넣지 않고 운영자가 명령행으로만 전달합니다.
+--migrate-from-commit은 공개 Git 이력을 교체한 뒤 현재 활성 release가
+새 main과 이어지지 않을 때만 사용합니다. 현재 활성 commit을 정확히
+지정해야 하며, 새 main tip과 동일한 --commit·--frozen-commit도 필요합니다.
 첫 게시에서는 --site-env로 설치 전 비공개 설정 파일을 지정할 수 있습니다.
 기존 release와 참가자의 작업 폴더는 삭제하지 않습니다.
 EOF
@@ -47,6 +50,7 @@ site_env_override=""
 ref_override=""
 commit_override=""
 frozen_commit=""
+migration_from_commit=""
 while (( $# > 0 )); do
     case "$1" in
         --root)
@@ -74,6 +78,11 @@ while (( $# > 0 )); do
             frozen_commit="$2"
             shift 2
             ;;
+        --migrate-from-commit)
+            (( $# >= 2 )) || { usage >&2; exit 2; }
+            migration_from_commit="$2"
+            shift 2
+            ;;
         -h|--help) usage; exit 0 ;;
         *) printf '알 수 없는 옵션입니다: %s\n' "$1" >&2; usage >&2; exit 2 ;;
     esac
@@ -85,6 +94,12 @@ done
     die "--commit에는 정확한 40자리 소문자 SHA가 필요합니다"
 [[ -z "$frozen_commit" || "$frozen_commit" =~ ^[a-f0-9]{40}$ ]] ||
     die "--frozen-commit 형식이 올바르지 않습니다"
+[[ -z "$migration_from_commit" || "$migration_from_commit" =~ ^[a-f0-9]{40}$ ]] ||
+    die "--migrate-from-commit 형식이 올바르지 않습니다"
+if [[ -n "$migration_from_commit" ]]; then
+    [[ -n "$commit_override" && -n "$frozen_commit" && "$commit_override" == "$frozen_commit" ]] ||
+        die "--migrate-from-commit에는 동일한 --commit과 --frozen-commit이 필요합니다"
+fi
 
 for required_command in awk bash chmod dirname git grep id install mv tar python3 mktemp \
     sha256sum find sort xargs stat flock readlink; do
@@ -323,6 +338,10 @@ fi
 [[ "$course_commit" =~ ^[a-f0-9]{40}$ ]] || die "Git commit 형식이 올바르지 않습니다"
 [[ -z "$frozen_commit" || "$course_commit" == "$frozen_commit" ]] ||
     die "행사 freeze commit과 다릅니다: requested=$course_commit frozen=$frozen_commit"
+if [[ -n "$migration_from_commit" ]]; then
+    [[ "$course_commit" == "$branch_tip" ]] ||
+        die "--migrate-from-commit의 목표는 origin/$course_ref 최신 commit이어야 합니다"
+fi
 
 active_release="${site[KSC_COURSE_RELEASE]}"
 [[ "$active_release" == "${release_root}/"* ]] ||
@@ -333,6 +352,7 @@ if [[ -e "$active_release" || -L "$active_release" ]]; then
 elif [[ "$active_release" != "${release_root}/REPLACE_WITH_VERIFIED_COMMIT" ]]; then
     die "현재 활성 release 경로가 존재하지 않습니다: $active_release"
 fi
+history_migration_authorized=0
 if [[ -d "$active_release" && ! -L "$active_release" ]]; then
     active_commit="$(tr -d '\r\n' <"${active_release}/.ksc2026-course-revision" 2>/dev/null || true)"
     [[ "$active_commit" =~ ^[a-f0-9]{40}$ ]] ||
@@ -342,10 +362,14 @@ if [[ -d "$active_release" && ! -L "$active_release" ]]; then
         die "현재 활성 release 경로와 commit이 정확히 일치하지 않습니다: $active_release"
     [[ "$(stat -c '%u' "$active_release")" == "$actor_uid" ]] ||
         die "현재 활성 release가 중앙 owner 소유가 아닙니다: $active_release"
-    git_safe --git-dir="$mirror_dir" cat-file -e "${active_commit}^{commit}" 2>/dev/null ||
-        die "현재 활성 commit이 승인된 저장소 mirror에 없습니다: $active_commit"
-    git_safe --git-dir="$mirror_dir" merge-base --is-ancestor "$active_commit" "$course_commit" ||
-        die "현재 활성 commit에서 새 commit으로 fast-forward할 수 없습니다: current=$active_commit requested=$course_commit"
+    if git_safe --git-dir="$mirror_dir" cat-file -e "${active_commit}^{commit}" 2>/dev/null &&
+       git_safe --git-dir="$mirror_dir" merge-base --is-ancestor "$active_commit" "$course_commit"; then
+        :
+    else
+        [[ -n "$migration_from_commit" && "$active_commit" == "$migration_from_commit" ]] ||
+            die "현재 활성 commit에서 새 commit으로 fast-forward할 수 없습니다: current=$active_commit requested=$course_commit"
+        history_migration_authorized=1
+    fi
 fi
 
 # Reject links, gitlinks, special modes, path traversal, control characters and
@@ -440,6 +464,10 @@ verify_release() {
 if [[ -d "$active_release" && ! -L "$active_release" ]]; then
     verify_release "$active_release" "$active_commit" ||
         die "현재 활성 release의 내용·권한·SHA256 manifest가 계약과 다릅니다: $active_release"
+fi
+if (( history_migration_authorized == 1 )); then
+    printf '운영자가 지정한 기존 release에서 새 공개 이력으로 전환합니다: %s -> %s\n' \
+        "$active_commit" "$course_commit"
 fi
 
 if [[ -e "$release_dir" ]]; then
@@ -588,3 +616,4 @@ printf 'KSC_COURSE_COMMIT=%s\n' "$course_commit"
 printf 'KSC_COURSE_RELEASE=%s\n' "$release_dir"
 printf 'KSC_SIF_SHA256=%s\n' "$site_sif_sha"
 printf 'KSC_COURSE_RELEASE_ACTIVATED=%s\n' "$course_release_activated"
+printf 'KSC_COURSE_HISTORY_MIGRATED=%s\n' "$history_migration_authorized"

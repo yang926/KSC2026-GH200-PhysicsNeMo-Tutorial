@@ -71,6 +71,11 @@ for marker in \
     'max_course_blob_bytes=$((256 * 1024 * 1024))' \
     'max_course_total_bytes=$((2 * 1024 * 1024 * 1024))' \
     'merge-base --is-ancestor "$active_commit" "$course_commit"' \
+    '--migrate-from-commit' \
+    '[[ -n "$commit_override" && -n "$frozen_commit" && "$commit_override" == "$frozen_commit" ]]' \
+    '[[ "$course_commit" == "$branch_tip" ]]' \
+    '[[ -n "$migration_from_commit" && "$active_commit" == "$migration_from_commit" ]]' \
+    'KSC_COURSE_HISTORY_MIGRATED=%s' \
     '! find "$directory" -perm /222 -print -quit | grep -q . || return 1' \
     '--root "$validation_dir"' \
     '--participant-validator "$trusted_participant_validator"' \
@@ -145,6 +150,23 @@ for expected in \
         exit 1
     }
 done
+
+publisher_help_output="$(bash "$publisher" --help)"
+[[ "$publisher_help_output" == *'--migrate-from-commit'* ]] || {
+    printf 'Publisher help is missing the explicit history migration option.\n' >&2
+    exit 1
+}
+if migration_guard_output="$(
+    bash "$publisher" --migrate-from-commit 0000000000000000000000000000000000000000 2>&1
+)"; then
+    printf 'Publisher accepted history migration without frozen source and target commits.\n' >&2
+    exit 1
+fi
+[[ "$migration_guard_output" == *'동일한 --commit과 --frozen-commit이 필요합니다'* ]] || {
+    printf 'Publisher history migration guard did not fail for the expected reason.\n' >&2
+    printf '%s\n' "$migration_guard_output" >&2
+    exit 1
+}
 
 temporary_output="$(mktemp "${TMPDIR:-/tmp}/ksc2026-unified-admin.XXXXXXXX")"
 trap 'rm -f -- "$temporary_output"' EXIT
