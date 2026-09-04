@@ -184,19 +184,26 @@ def _save_test_example(
     destination.parent.mkdir(parents=True, exist_ok=True)
     figure, axes = plt.subplots(1, 4, figsize=(15, 3.6), constrained_layout=True)
     fields = (source_field, target, prediction, absolute_error)
-    titles = ("f (소스항)", "u (정답)", "u_pred (예측)", "|u_pred - u| (절대 오차)")
-    for axis, field, title in zip(axes, fields, titles):
+    # 그림 안의 글자는 영문으로 둡니다. 교육용 SIF의 matplotlib에는 한글 글꼴이
+    # 없어 한글 라벨이 네모로 깨집니다. 설명은 노트북 마크다운에 한국어로 있습니다.
+    titles = (
+        "f  (source)",
+        "u  (ground truth)",
+        "u_pred  (prediction)",
+        "|u_pred - u|  (absolute error)",
+    )
+    for index, (axis, field, title) in enumerate(zip(axes, fields, titles)):
         image = axis.imshow(
             field,
             origin="lower",
-            cmap="magma" if "절대 오차" in title else "coolwarm",
+            cmap="magma" if index == 3 else "coolwarm",
         )
         axis.set_title(title)
-        axis.set_xlabel("격자 x")
-        axis.set_ylabel("격자 y")
+        axis.set_xlabel("grid x")
+        axis.set_ylabel("grid y")
         figure.colorbar(image, ax=axis, fraction=0.046, pad=0.04)
     figure.suptitle(
-        f"테스트 표본 {sample_index} · 상대 L2={sample_relative_l2:.3e}",
+        f"test sample {sample_index} · relative L2 = {sample_relative_l2:.3e}",
         fontsize=12,
     )
     figure.savefig(destination, dpi=150, bbox_inches="tight")
