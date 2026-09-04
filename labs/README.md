@@ -35,4 +35,4 @@ FNO 데이터 흐름 그림에서 주파수 경로는 FFT로 변환한 일부 �
 
 실행 파일, Nsight 보고서, 데이터셋, 체크포인트, 검증 그래프와 평가 지표는 `work/` 또는 각 실습의 `datasets/`, `outputs/` 아래에 생성됩니다. 이 결과 파일은 개인 작업공간에 저장되며 Git 배포 원본에는 포함되지 않습니다.
 
-[GH200 모듈 지도](../01_GH200/README.md) · [PhysicsNeMo 모듈 지도](../02_PhysicsNeMo/README.md) · [전체 과정 안내](../README.md)
+[GH200 모듈 안내](../01_GH200/README.md) · [PhysicsNeMo 모듈 안내](../02_PhysicsNeMo/README.md) · [전체 과정 안내](../README.md)

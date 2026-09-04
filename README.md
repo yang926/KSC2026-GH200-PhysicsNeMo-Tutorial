@@ -8,7 +8,7 @@
 
 <p align="center"><a href="#행사-당일-jupyterlab-접속">접속·재접속 안내</a> · <a href="#과정-개요">전체 과정 구성</a></p>
 
-<p align="center"><a href="01_GH200/README.md">01 GH200 모듈 지도</a> · <a href="02_PhysicsNeMo/README.md">02 PhysicsNeMo 모듈 지도</a></p>
+<p align="center"><a href="01_GH200/README.md">01 GH200 모듈 안내</a> · <a href="02_PhysicsNeMo/README.md">02 PhysicsNeMo 모듈 안내</a></p>
 
 ---
 
@@ -16,9 +16,11 @@
 
 ## 행사 당일 JupyterLab 접속
 
-강의 슬라이드(PPT)에 안내된 PILOT SSH 명령으로 로그인한 뒤 공용 명령을 실행하면, Slurm이 현재 사용 가능한 계산 노드의 NVIDIA GH200 한 개를 배정합니다. 참가자 컴퓨터에서 로컬 터미널 두 개와 웹 브라우저를 사용합니다.
+PILOT 로그인 노드에서 공용 명령을 실행하면 Slurm이 사용 가능한 계산 노드의 NVIDIA GH200 한 개를 배정합니다. 참가자 컴퓨터에서 **로컬 터미널 두 개와 웹 브라우저**를 사용합니다.
 
-1. **로컬 터미널 1**에서 강의 슬라이드(PPT)에 안내된 PILOT SSH 명령을 실행하고 OTP와 비밀번호를 입력합니다.
+> **접속은 2단계입니다.** 5호기(Nurion)에 먼저 접속한 뒤 거기서 PILOT 로그인 노드로 들어갑니다. 각 단계에서 OTP와 비밀번호를 입력합니다. 실제 주소와 계정 형식은 강의 슬라이드에 있습니다.
+
+1. **로컬 터미널 1**에서 강의 슬라이드의 순서대로 5호기를 거쳐 PILOT 로그인 노드에 접속합니다.
 2. PILOT 로그인 노드에 접속되면 다음 한 줄을 실행합니다.
 
    ```bash
@@ -35,7 +37,7 @@
 - 파일은 `/scratch/<계정>/ksc2026/workspaces/`에 저장되며 SSH 연결이나 Slurm Job이 끝나도 남습니다.
 - 브라우저만 닫았다면 같은 주소를 다시 엽니다.
 - 터미널 2의 터널이 끊겼다면 터미널 1에서 공용 명령을 다시 실행하고, 다시 표시된 `ssh -N ...` 명령을 새 로컬 터미널에서 실행합니다.
-- PILOT 로그인까지 끊겼다면 강의 슬라이드(PPT)에 안내된 SSH 명령으로 다시 로그인한 뒤 공용 명령을 실행합니다.
+- PILOT 로그인까지 끊겼다면 **5호기 → PILOT** 2단계 접속을 처음부터 다시 하고 공용 명령을 실행합니다.
 - 활성 Job이 남아 있으면 같은 Job과 작업공간으로 돌아갑니다. Job이 끝난 경우에도 저장 파일은 남지만 Python 변수, GPU 메모리와 실행 중이던 셀은 사라집니다.
 
 ### 기억할 명령 세 개
@@ -61,7 +63,7 @@
 
 | 시간 | 세션 | 사용하는 자료 | 핵심 결과 |
 |---|---|---|---|
-| 11:00–12:00 | GH200 소개 | 현장 강의 슬라이드 | Grace CPU, Hopper GPU, CPU·GPU 일관성 메모리 구조 이해 |
+| 11:00–12:00 | GH200 소개 | 강의 슬라이드 | Grace CPU, Hopper GPU, CPU·GPU 일관성 메모리 구조 이해 |
 | 13:30–14:00 | Grace CPU 컴파일·튜닝 | [`01_CPU_Compile_and_Tune.ipynb`](01_GH200/01_CPU_Compile_and_Tune.ipynb) | OpenBLAS·NVPL 빌드, 정확성 확인, 스레드별 성능표 |
 | 14:00–14:30 | Hopper GPU 메모리·프로파일링 | [`02_GPU_Memory_Profile.ipynb`](01_GH200/02_GPU_Memory_Profile.ipynb) | CUDA 메모리 경로, Nsight Systems 보고서, 전송 대역폭 |
 | 14:40–16:00 | PhysicsNeMo 기본/PINN | [`01_Projectile_PINN.ipynb`](02_PhysicsNeMo/01_Projectile_PINN.ipynb) | 발사체 궤적 예측, 검증 오차, 결과 그래프 |
@@ -109,11 +111,11 @@
 - CUDA 통합 메모리(`cudaMallocManaged`)
 - 시스템 할당 메모리(`new`)
 
-시스템 할당 메모리는 세 번째 할당 방식입니다. ATS와 HMM은 GPU가 이 메모리에 접근할 때 사용할 수 있는 일관성 경로이며 별도의 메모리 할당 API가 아닙니다. `SKIP`은 해당 GPU·드라이버 환경에서 시스템 할당 메모리 접근 경로를 사용할 수 없음을 나타냅니다.
+세 방식은 **할당 방법**이 다릅니다. ATS와 HMM은 할당 API가 아니라 GPU가 시스템 메모리에 접근할 때 쓰는 주소 변환·일관성 경로입니다. 노트북이 런타임 속성을 읽어 실제 경로를 판정합니다. 자세한 설명은 모듈 안내에 있습니다.
 
-Nsight Systems에서는 CUDA API·메모리 작업·커널 실행 순서를 확인하고, nvbandwidth에서는 호스트↔디바이스 복사 대역폭을 측정합니다.
+이어서 Nsight Systems로 CUDA API·메모리 작업·커널의 실행 순서를 보고, nvbandwidth로 호스트↔디바이스 복사 대역폭을 Copy Engine과 SM 커널 두 방식으로 측정합니다.
 
-[01_GH200 상세 모듈 지도 →](01_GH200/README.md)
+[01_GH200 모듈 안내 →](01_GH200/README.md)
 
 ## 02_PhysicsNeMo — PINN과 FNO로 물리 방정식 풀기
 
@@ -134,18 +136,11 @@ $$
 
 ### Poisson FNO
 
-FNO 실습에서는 공간마다 주어진 소스항 `f(x,y)`와 그에 대응하는 Poisson 해 `u(x,y)`의 예를 학습합니다. 학습을 마치면 새로운 소스항 전체를 입력받아 격자 전체의 해를 예측합니다.
+PINN은 발사 조건 하나의 궤적을 구합니다. FNO는 방향이 다릅니다. 소스항 `f(x,y)`와 해 `u(x,y)`의 쌍을 여러 개 학습해 **입력 함수에서 출력 함수로 가는 규칙 자체**를 익히고, 학습이 끝나면 처음 보는 `f`를 받아 격자 전체의 `u`를 한 번에 예측합니다.
 
-| 구분 | 발사체 PINN | Poisson FNO |
-|---|---|---|
-| 입력 | 시간 `t` | 격자 위 소스항 `f(x,y)` |
-| 출력 | 고정된 초기조건의 궤적 `x(t), y(t)` | 소스항에 대응하는 해 `u(x,y)` |
-| 학습 신호 | 초기조건 + ODE 잔차 | 여러 소스항·해의 쌍 `(f,u)` |
-| 평가 | 해석해와 궤적 비교 | 학습에 사용하지 않은 소스항의 해와 비교 |
+FNO는 공간 패턴을 주파수별 성분으로 표현하고, 선택한 푸리에 성분에만 학습 가능한 가중치를 적용합니다. 두 방법의 입력·출력·학습 신호를 나란히 비교한 표와 PhysicsNeMo-Sym 구성·FNO 데이터 흐름은 모듈 안내에 코드와 함께 있습니다.
 
-FNO는 공간 패턴을 주파수별 성분으로 표현하고, 선택한 푸리에 성분에 학습 가능한 가중치를 적용합니다. 자세한 PhysicsNeMo-Sym 구성과 FNO 데이터 흐름은 모듈 안내에서 코드와 함께 설명합니다.
-
-[02_PhysicsNeMo 상세 모듈 지도 →](02_PhysicsNeMo/README.md)
+[02_PhysicsNeMo 모듈 안내 →](02_PhysicsNeMo/README.md)
 
 ## 실습 환경
 
@@ -175,34 +170,9 @@ import physicsnemo.sym
 
 행사 중에는 계산 노드가 오프라인이므로 `pip install`을 실행하지 않습니다.
 
-### 행사 후 개인 환경에서 PhysicsNeMo 사용
+### 행사 후 개인 환경에서 사용하려면
 
-개인 환경이 [PhysicsNeMo 시스템 요구사항](https://docs.nvidia.com/physicsnemo/latest/getting-started/system_requirements.html)을 만족한다면 Python 가상환경에 최신 패키지를 설치할 수 있습니다. 아래 명령은 기본·CPU 검증용입니다.
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install "nvidia-physicsnemo[sym]"
-```
-
-NVIDIA GPU를 사용하는 새 환경에서는 위 명령을 그대로 복사하기 전에 [공식 설치 안내](https://docs.nvidia.com/physicsnemo/latest/getting-started/installation.html)의 호환표에서 PyTorch와 CUDA 조합을 확인합니다. 문서가 안내하는 환경에 맞춰 `cu12` 또는 `cu13` extra를 `sym`과 함께 선택하거나, 호환되는 PyTorch를 먼저 설치합니다. 운영체제·드라이버·CUDA 버전에 관계없이 통하는 단일 GPU 설치 명령은 없습니다.
-
-설치 뒤에는 패키지 이름이 아니라 다음 import 이름으로 확인합니다.
-
-```python
-from importlib.metadata import version
-import torch
-import physicsnemo
-import physicsnemo.sym
-
-print("PhysicsNeMo:", version("nvidia-physicsnemo"))
-print("CUDA 사용 가능:", torch.cuda.is_available())
-```
-
-`torch.cuda.is_available()`이 `False`이면 PhysicsNeMo import 성공과 별개로 NVIDIA 드라이버·CUDA가 연결된 실행 환경인지 확인해야 합니다. 설치 가능한 Python·PyTorch·CUDA 조합은 [공식 설치 안내](https://docs.nvidia.com/physicsnemo/latest/getting-started/installation.html)를 우선합니다.
-
-이 과정의 노트북은 고정된 **PhysicsNeMo 25.11 SIF**를 기준으로 작성했습니다. 최신 PhysicsNeMo v2.0에서는 API 구성이 달라졌으므로 기존 `Solver`·`Domain`·`Constraint` 코드를 그대로 실행하기보다 [v2.0 migration guide](https://github.com/NVIDIA/physicsnemo/blob/main/v2.0-MIGRATION-GUIDE.md)와 최신 예제를 기준으로 옮깁니다. 행사와 같은 25.11 환경을 정확히 재현해야 할 때만 공식 25.11 컨테이너를 선택하면 됩니다. 일반적인 새 프로젝트에서 컨테이너 사용은 필수가 아닙니다.
+행사 당일에는 필요 없는 내용입니다. 집·연구실 환경에 PhysicsNeMo를 설치하는 방법, 이 실습 코드를 25.11 API 그대로 재현하는 방법, 최신 v2.0으로 옮기는 방법은 [**행사 후 안내**](AFTER_EVENT.md)에 따로 정리했습니다.
 
 ### 검증된 이미지 구성
 
@@ -234,6 +204,7 @@ print("CUDA 사용 가능:", torch.cuda.is_available())
 ```text
 .
 ├── README.md
+├── AFTER_EVENT.md          # 행사 후 개인 환경 안내
 ├── 00_Start_Here.ipynb
 ├── 01_GH200/
 │   ├── README.md
@@ -255,7 +226,7 @@ print("CUDA 사용 가능:", torch.cuda.is_available())
 
 ## 추가 학습 자료
 
-필수 FNO 실습을 일찍 마친 참가자는 진행자 안내에 따라 [FNO 푸리에 모드 수 비교](02_PhysicsNeMo/optional/README.md)를 진행할 수 있습니다.
+필수 FNO 실습을 일찍 마친 참가자는 강사 안내에 따라 [FNO 푸리에 모드 수 비교](02_PhysicsNeMo/optional/README.md)를 진행할 수 있습니다.
 
 - [OpenHackathons AI-Powered-Physics-Bootcamp](https://github.com/openhackathons-org/AI-Powered-Physics-Bootcamp)
 - [원본 튜토리얼 모음](https://github.com/openhackathons-org/AI-Powered-Physics-Bootcamp/tree/main/tutorial)

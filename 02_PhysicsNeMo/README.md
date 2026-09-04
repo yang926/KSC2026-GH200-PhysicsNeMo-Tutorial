@@ -11,11 +11,11 @@
 - FNO가 FFT로 공간 패턴을 주파수 성분으로 나누고, 선택한 성분을 학습해 해를 예측하는 과정을 설명합니다.
 - 별도 테스트 데이터에서 학습 전후 오차를 비교하고 실행 시간·GPU 메모리 측정값을 해석합니다.
 
-## 모듈 지도
+## 모듈 안내
 
 | 시간 | 필수 동선 | 참가자 활동 | 핵심 결과 |
 |---|---|---|---|
-| 14:40–16:00 | [02-1 발사체 운동 PINN](01_Projectile_PINN.ipynb) | 초기속도·발사각 선택 → 해석해 두 줄 완성 → ODE 잔차 목표값 수정 → 학습 → 특정 시점 예측 비교 | `validator.npz`, 상대 L2·최대 절대 오차, 궤적 그래프 |
+| 14:40–16:00 | [02-1 발사체 운동 PINN](01_Projectile_PINN.ipynb) | 초기속도(25–40 m/s)·발사각(25–65°) 선택 → 해석해 두 줄 완성 → ODE 잔차 목표값 확인 → 학습 → 특정 시점 예측 비교 | `validator.npz`, 상대 L2·최대 절대 오차, 궤적 그래프 |
 | 16:10–17:30 | [02-2 Poisson FNO](02_Poisson_FNO.ipynb) | 테스트 표본 선택 → FFT 직접해법 한 줄 완성 → `fno_modes`·학습 단계 설정 → 학습 전후 테스트 오차 비교 | 테스트 지표 JSON, 입력·정답·예측·오차 그림 |
 | 조기 완료 | [FNO 모드 수 통제 비교](optional/FNO_Mode_Ablation.ipynb) | 다른 조건을 고정하고 모드 6개·12개 실행 → 시간·모델 크기·메모리·오차 비율 계산 | 두 설정의 비교표와 그래프 |
 
@@ -98,43 +98,9 @@ KSC2026 계산 노드는 인터넷을 사용하지 않습니다. 참가자가 `a
 
 SIF는 읽기 전용 실행 환경이고, 참가자가 수정하는 노트북과 생성한 결과는 개인 `/scratch/$USER/ksc2026/` 작업공간에 저장됩니다. 이미지와 작업 파일이 분리되어 있으므로 세션을 다시 시작해도 저장한 노트북과 결과 파일은 남습니다.
 
-## 행사 후 개인 환경 — 목적에 따라 선택합니다
+## 행사 후 개인 환경
 
-### 이 실습을 같은 API로 재현
-
-이 과정의 코드는 PhysicsNeMo 25.11의 `Solver` / `Domain` / `Constraint` API에 맞춰져 있습니다. 코드를 그대로 재현하려면 다음 중 하나를 사용합니다.
-
-- Apptainer를 사용할 수 있는 Linux/ARM64 시스템: 행사 SIF와 같은 이미지 계약을 사용합니다.
-- Docker와 NVIDIA Container Toolkit을 사용할 수 있는 GPU Linux 시스템: `nvcr.io/nvidia/physicsnemo/physicsnemo:25.11` NGC 컨테이너를 기준으로 실습 파일을 마운트합니다.
-
-호스트 아키텍처, NVIDIA 드라이버, 컨테이너 런타임이 맞아야 합니다. 행사 SIF가 모든 개인 PC에서 그대로 실행된다고 가정하지 않습니다.
-
-### 새 프로젝트를 최신 API로 시작
-
-PhysicsNeMo v2.0 이후에는 Sym 기능이 PhysicsNeMo 본체 저장소에 통합되었습니다. 새 가상환경에서는 공식 설치 지침과 자신의 CUDA/PyTorch 조합을 먼저 확인합니다. 아래 명령은 기본·CPU 검증용입니다.
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-
-# 기본 기능만 필요한 경우
-python -m pip install nvidia-physicsnemo
-
-# 물리식 잔차와 Sym 기능까지 필요한 경우
-python -m pip install "nvidia-physicsnemo[sym]"
-```
-
-NVIDIA GPU 환경은 [공식 설치 안내](https://docs.nvidia.com/physicsnemo/latest/getting-started/installation.html)의 호환표에 따라 `cu12` 또는 `cu13` extra를 `sym`과 함께 선택하거나, 호환되는 PyTorch를 먼저 설치합니다. 운영체제·드라이버·CUDA 버전에 관계없이 통하는 단일 GPU 설치 명령은 없습니다.
-
-설치 배포 이름은 `nvidia-physicsnemo`이고 Python import 이름은 `physicsnemo`입니다.
-
-```python
-import physicsnemo
-import physicsnemo.sym  # sym extra를 설치한 경우
-```
-
-> **API 호환성 주의:** 이 과정의 25.11 코드는 최신 v2.0 환경에 그대로 복사해 실행하는 예제가 아닙니다. v2.0에서는 기존 `Solver` / `Domain` / `Constraint` 중심 구성 대신 더 명시적인 PyTorch 학습 루프와 새 Sym API를 사용합니다. 새 프로젝트에서는 공식 migration guide와 최신 예제를 기준으로 코드를 옮깁니다. 64-bit ARM CUDA 환경은 최신 공식 문서의 `uv` 설치 지침을 우선 확인합니다.
+행사 당일에는 필요 없습니다. 개인 환경 설치, 25.11 API 그대로 재현하기, 최신 v2.0으로 옮기기는 [행사 후 안내](../AFTER_EVENT.md)에 정리했습니다.
 
 ## 실습별 생성 파일
 
@@ -153,7 +119,11 @@ import physicsnemo.sym  # sym extra를 설치한 경우
 | `gh200` | GH200 대규모 후보 설정 | 256×256 격자, 학습/검증/테스트 2048/256/256개, 6개 층, 푸리에 모드 32개, 채널 너비 64, 2000단계 |
 | `recovery` | 수업용 단축 설정 | 64×64 격자, 학습/검증/테스트 800/100/100개, 4개 층, 푸리에 모드 12개, 채널 너비 32, 400단계 |
 
-`gh200`은 계산량을 높인 후보 설정이며, 80분 세션 안에 학습과 평가를 마치는지는 행사 전 PILOT GH200 예행연습에서 확인해야 합니다. 강사가 `gh200` 완주를 확인하지 않은 경우에는 `recovery`를 사용합니다. 두 설정은 격자·데이터·모델 크기와 학습 단계가 모두 다르므로 성능 비교용으로 사용하지 않습니다. 한 요인의 효과를 비교하려면 선택 실습처럼 데이터·난수 시드·층 수·채널 너비·배치·학습 단계를 고정하고 `fno_modes`만 바꿉니다.
+> **강사 확인 필수.** `gh200`은 계산량을 높인 후보 설정입니다. 데이터셋 2,560개(256×256) 생성 시간까지 포함해 80분 안에 끝나는지 **행사 전 PILOT GH200 예행연습에서 반드시 실측**해야 합니다. 완주를 확인하지 않았다면 `recovery`로 진행합니다.
+>
+> 데이터셋을 미리 생성해 중앙 게시본에 포함해 두면 참가자 세션에서 검증만 하고 넘어가므로 수 분을 절약할 수 있습니다.
+
+두 설정은 격자·데이터·모델 크기와 학습 단계가 모두 다르므로 성능 비교용으로 사용하지 않습니다. 한 요인의 효과를 비교하려면 선택 실습처럼 데이터·난수 시드·층 수·채널 너비·배치·학습 단계를 고정하고 `fno_modes`만 바꿉니다.
 
 ## 완료 체크리스트
 
@@ -181,13 +151,11 @@ import physicsnemo.sym  # sym extra를 설치한 경우
 
 ## 참고 자료
 
-- [PhysicsNeMo 25.11 문서](https://docs.nvidia.com/physicsnemo/25.11/)
-- [최신 PhysicsNeMo 문서](https://docs.nvidia.com/physicsnemo/latest/)
-- [최신 PhysicsNeMo 설치 안내](https://docs.nvidia.com/physicsnemo/latest/getting-started/installation.html)
-- [PhysicsNeMo v2.0 Migration Guide](https://github.com/NVIDIA/physicsnemo/blob/main/v2.0-MIGRATION-GUIDE.md)
-- [NVIDIA PhysicsNeMo NGC 컨테이너](https://catalog.ngc.nvidia.com/orgs/nvidia/physicsnemo/containers/physicsnemo)
-- [FNO 논문](https://arxiv.org/abs/2010.08895)
-- [PINN 논문](https://www.sciencedirect.com/science/article/pii/S0021999118307125)
+노트북 실행에는 인터넷 연결이 필요하지 않습니다. 아래는 행사 후에 볼 자료입니다.
+
+- [PhysicsNeMo 25.11 문서](https://docs.nvidia.com/physicsnemo/25.11/) — 이 과정의 기준 문서
+- [FNO 논문](https://arxiv.org/abs/2010.08895) · [PINN 논문](https://www.sciencedirect.com/science/article/pii/S0021999118307125)
 - [OpenHackathons AI-Powered-Physics-Bootcamp 원본 과정](https://github.com/openhackathons-org/AI-Powered-Physics-Bootcamp)
+- 설치·마이그레이션 안내는 [행사 후 안내](../AFTER_EVENT.md)에 있습니다.
 
 [Start Here로 돌아가기](../00_Start_Here.ipynb) · [전체 과정 안내 보기](../README.md)

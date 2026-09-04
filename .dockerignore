@@ -6,6 +6,7 @@
 !Dockerfile
 !Singularity
 !README.md
+!AFTER_EVENT.md
 !LICENSE
 !PROVENANCE.md
 !Deployment_Guide.MD

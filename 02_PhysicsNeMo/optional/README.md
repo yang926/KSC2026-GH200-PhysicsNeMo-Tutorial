@@ -20,4 +20,4 @@
 - [원본 튜토리얼 모음](https://github.com/openhackathons-org/AI-Powered-Physics-Bootcamp/tree/main/tutorial)
 - [원본 챌린지 모음](https://github.com/openhackathons-org/AI-Powered-Physics-Bootcamp/tree/main/challenge)
 
-[PhysicsNeMo 모듈 지도로 돌아가기](../README.md) · [Start Here로 돌아가기](../../00_Start_Here.ipynb)
+[PhysicsNeMo 모듈 안내로 돌아가기](../README.md) · [Start Here로 돌아가기](../../00_Start_Here.ipynb)

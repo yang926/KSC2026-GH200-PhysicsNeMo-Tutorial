@@ -27,6 +27,7 @@ Stage: final
     .dockerignore /opt/ksc2026/course-source/.dockerignore
     course-release.json /opt/ksc2026/course-source/course-release.json
     README.md /opt/ksc2026/course-source/README.md
+    AFTER_EVENT.md /opt/ksc2026/course-source/AFTER_EVENT.md
     LICENSE /opt/ksc2026/course-source/LICENSE
     PROVENANCE.md /opt/ksc2026/course-source/PROVENANCE.md
     Deployment_Guide.MD /opt/ksc2026/course-source/Deployment_Guide.MD
