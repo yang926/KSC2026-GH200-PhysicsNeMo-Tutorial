@@ -10,6 +10,14 @@
   std::fprintf(stderr, "%s:%d %s\n", __FILE__, __LINE__, cudaGetErrorString(e)); \
   std::exit(2); }} while(0)
 
+// 통합 메모리를 GPU에서 먼저 초기화하면 페이지가 HBM에 자리 잡고, HBM을
+// 넘는 부분만 시스템 메모리로 넘어갑니다. CPU에서 초기화하면 전량이 시스템
+// 메모리에 first-touch되어 Job 메모리 한도를 넘길 수 있습니다.
+__global__ void init_kernel(std::size_t n, float *x, float *y) {
+  for (std::size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n;
+       i += blockDim.x * gridDim.x) { x[i] = 1.0f; y[i] = 2.0f; }
+}
+
 __global__ void add_kernel(std::size_t n, const float *x, float *y) {
   for (std::size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n;
        i += blockDim.x * gridDim.x) y[i] += x[i];
@@ -41,6 +49,14 @@ int main(int argc, char **argv) {
     return 2;
   }
   const bool use_prefetch = std::strcmp(mode, "prefetch") == 0;
+
+  // 세 번째 인수로 초기화 위치를 고릅니다. 기본은 cpu입니다.
+  const char *init_where = argc > 3 ? argv[3] : "cpu";
+  if (std::strcmp(init_where, "cpu") != 0 && std::strcmp(init_where, "gpu") != 0) {
+    std::fprintf(stderr, "init must be cpu or gpu\n");
+    return 2;
+  }
+  const bool init_on_gpu = std::strcmp(init_where, "gpu") == 0;
   const std::size_t bytes = n * sizeof(float);
   float *x = nullptr, *y = nullptr;
   // 통합 메모리는 HBM을 넘겨도 할당됩니다. 시스템 메모리까지 부족할 때만
@@ -60,12 +76,17 @@ int main(int argc, char **argv) {
     if (x) cudaFree(x);
     return 0;
   }
-  // 큰 배열에서는 첫 접촉(first touch) 비용이 크므로 CPU 코어를 모두 쓴다.
-  // 초기화를 CPU에서 하므로 페이지는 Grace의 LPDDR5X에 자리 잡는다.
+  if (init_on_gpu) {
+    init_kernel<<<1024, 256>>>(n, x, y);
+    CUDA_OK(cudaGetLastError());
+    CUDA_OK(cudaDeviceSynchronize());
+  } else {
+    // 큰 배열에서는 첫 접촉(first touch) 비용이 크므로 CPU 코어를 모두 씁니다.
 #pragma omp parallel for schedule(static)
-  for (std::ptrdiff_t i = 0; i < static_cast<std::ptrdiff_t>(n); ++i) {
-    x[i] = 1.0f;
-    y[i] = 2.0f;
+    for (std::ptrdiff_t i = 0; i < static_cast<std::ptrdiff_t>(n); ++i) {
+      x[i] = 1.0f;
+      y[i] = 2.0f;
+    }
   }
   if (use_prefetch) {
     // HBM보다 큰 배열에서는 전량 사전 이동이 불가능하므로 런타임이 요청을
@@ -81,8 +102,9 @@ int main(int argc, char **argv) {
   CUDA_OK(cudaDeviceSynchronize());
   const bool ok = std::fabs(y[0]-3.0f)<1e-6f && std::fabs(y[n-1]-3.0f)<1e-6f;
   std::printf(
-      "managed memory mode=%s elements=%zu bytes=%zu result=%s first=%.1f last=%.1f\n",
-      mode, n, bytes, ok?"PASS":"FAIL", y[0], y[n-1]);
+      "managed memory mode=%s init=%s elements=%zu bytes=%zu result=%s "
+      "first=%.1f last=%.1f\n",
+      mode, init_where, n, bytes, ok?"PASS":"FAIL", y[0], y[n-1]);
   CUDA_OK(cudaFree(x)); CUDA_OK(cudaFree(y));
   return ok ? 0 : 3;
 }
