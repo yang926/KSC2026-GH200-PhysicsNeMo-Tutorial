@@ -980,6 +980,13 @@ def emit_session(
             "ServerAliveInterval=30",
             "-o",
             "ServerAliveCountMax=3",
+            "-o",
+            "PermitLocalCommand=yes",
+            "-o",
+            (
+                "LocalCommand=echo [KSC2026] 정상 접속되었습니다. "
+                "이 창을 닫지 말고 브라우저 주소를 여세요."
+            ),
             "-L",
             f"127.0.0.1:{LOCAL_JUPYTER_PORT}:{node}:{remote_port}",
             f"{username}@{login_host}",
@@ -1005,8 +1012,8 @@ def emit_session(
     print("[1/2] 로컬 컴퓨터에서 새 터미널 탭을 열어 아래 한 줄을 통째로 붙여 넣으세요.")
     print(tunnel_command)
     print()
-    print("OTP와 비밀번호를 입력한 뒤 화면에 아무 출력 없이 멈춰 있으면 정상입니다.")
-    print("이 터미널 탭은 실습 중 열어 두세요. (-L은 영문 대문자 L입니다.)")
+    print("OTP와 비밀번호를 입력하면 '[KSC2026] 정상 접속되었습니다.'가 표시됩니다.")
+    print("메시지가 표시된 뒤에는 터널을 유지하므로 프롬프트가 돌아오지 않습니다. 이 창은 실습 중 열어 두세요.")
     print("'Address already in use'가 나오면 로컬 8888을 쓰는 기존 Jupyter·SSH 터널을 닫고 다시 실행하세요.")
     print()
     print("[2/2] 웹 브라우저에서 아래 주소를 여세요.")

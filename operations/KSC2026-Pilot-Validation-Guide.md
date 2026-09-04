@@ -71,19 +71,19 @@ JupyterLab이 준비되면 화면에 다음 정보가 한 번씩 명확하게 �
 
 ```text
 [1/2] 새 로컬 터미널 탭을 열고 아래 명령을 그대로 붙여 넣으세요.
-ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 127.0.0.1:8888:<계산노드>:<원격포트> <계정>@<PILOT_LOGIN_HOST>
+ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o PermitLocalCommand=yes -o 'LocalCommand=echo [KSC2026] 정상 접속되었습니다. 이 창을 닫지 말고 브라우저 주소를 여세요.' -L 127.0.0.1:8888:<계산노드>:<원격포트> <계정>@<PILOT_LOGIN_HOST>
 
 [2/2] 웹 브라우저에서 아래 주소를 여세요.
 http://127.0.0.1:8888/lab/tree/README.md?token=<개인 token>
 ```
 
-사용자가 노드, 포트 또는 호스트를 직접 고치게 해서는 안 됩니다. `-L`은 영문 대문자 L입니다.
+사용자가 노드, 포트 또는 호스트를 직접 고치게 해서는 안 됩니다.
 
 ## 4. 새 로컬 터미널에서 SSH 터널 실행
 
 로컬 컴퓨터에서 **새 터미널 탭**을 열고, PILOT 터미널에 출력된 SSH 명령 전체를 그대로 붙여 넣습니다. 두 번째 SSH 인증에서 OTP와 비밀번호를 다시 요청할 수 있습니다.
 
-`ssh -N`은 원격 셸을 열지 않고 터널만 유지합니다. 인증이 끝난 뒤 프롬프트나 성공 메시지가 나타나지 않는 것이 정상입니다. 오류가 없다면 이 터미널을 닫지 않고 다음 단계로 이동합니다.
+인증이 완료되면 **`[KSC2026] 정상 접속되었습니다.`**가 표시되어야 합니다. 이후 `ssh -N`은 원격 셸을 열지 않고 터널만 유지하므로 프롬프트가 돌아오지 않습니다. 이 터미널을 닫지 않고 다음 단계로 이동합니다.
 
 다음 오류가 보이면 결과를 그대로 기록합니다.
 
