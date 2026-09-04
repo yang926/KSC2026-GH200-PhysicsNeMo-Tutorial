@@ -83,6 +83,8 @@ Stage: final
     labs/gh200/cuda_memory/explicit.cu /opt/ksc2026/course-source/labs/gh200/cuda_memory/explicit.cu
     labs/gh200/cuda_memory/managed.cu /opt/ksc2026/course-source/labs/gh200/cuda_memory/managed.cu
     labs/gh200/cuda_memory/hmm.cu /opt/ksc2026/course-source/labs/gh200/cuda_memory/hmm.cu
+    labs/gh200/pytorch_unified/managed_alloc.cu /opt/ksc2026/course-source/labs/gh200/pytorch_unified/managed_alloc.cu
+    labs/gh200/pytorch_unified/oversubscribe_torch.py /opt/ksc2026/course-source/labs/gh200/pytorch_unified/oversubscribe_torch.py
     labs/projectile/source_code/conf/config.yaml /opt/ksc2026/course-source/labs/projectile/source_code/conf/config.yaml
     labs/projectile/source_code/projectile.py /opt/ksc2026/course-source/labs/projectile/source_code/projectile.py
     labs/projectile/source_code/projectile_eqn.py /opt/ksc2026/course-source/labs/projectile/source_code/projectile_eqn.py

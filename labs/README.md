@@ -4,7 +4,7 @@
 
 ```text
 labs/
-├── gh200/          # DGEMM, CUDA 메모리 예제와 도우미 함수
+├── gh200/          # DGEMM, CUDA 메모리 예제, PyTorch 통합 메모리 데모
 ├── projectile/     # PhysicsNeMo-Sym 발사체 코드·설정·이미지
 └── poisson_fno/    # PhysicsNeMo FNO 코드·설정·데이터 생성기·이미지
 ```
@@ -17,6 +17,7 @@ labs/
 | `01_GH200/02_GPU_Memory_Profile.ipynb` | `gh200/cuda_memory/*.cu` | 명시적 복사·통합 메모리·시스템 할당 메모리 예제 |
 | `02_PhysicsNeMo/01_Projectile_PINN.ipynb` | `projectile/source_code/`, `projectile/images/` | 발사체 방정식, PhysicsNeMo-Sym 학습 설정과 개념 그림 |
 | `02_PhysicsNeMo/02_Poisson_FNO.ipynb` | `poisson_fno/generate_data.py`, `train_fno.py`, `conf/` | Poisson 데이터 생성, FNO 학습·평가와 실행 설정 |
+| `02_PhysicsNeMo/02_Poisson_FNO.ipynb` (12절) | `gh200/pytorch_unified/` | HBM보다 큰 텐서를 통합 메모리 할당기로 처리하는 GH200 데모 |
 | `02_PhysicsNeMo/optional/FNO_Mode_Ablation.ipynb` | `poisson_fno/`의 같은 학습 코드 | 푸리에 모드 수만 바꾸어 오차와 계산 비용 비교 |
 
 노트북에서 “직접 수정” 단계로 안내한 값과 코드만 바꿉니다. 공통 도우미 함수나 데이터 검증 코드를 임의로 바꾸면 이후 셀의 결과 형식이 달라질 수 있습니다.
