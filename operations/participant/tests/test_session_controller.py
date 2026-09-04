@@ -263,7 +263,7 @@ class UnifiedSessionControllerTests(unittest.TestCase):
         tunnel = (
             "ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 "
             "-o ServerAliveCountMax=3 -o PermitLocalCommand=yes "
-            "-o 'LocalCommand=echo [KSC2026] 정상 접속되었습니다. "
+            "-o 'LocalCommand=echo KSC2026 터널에 정상 접속되었습니다. "
             "이 창을 닫지 말고 브라우저 주소를 여세요.' -L "
             "127.0.0.1:8888:compute017:18882 edu001@pilot.example.test"
         )
@@ -275,7 +275,7 @@ class UnifiedSessionControllerTests(unittest.TestCase):
         self.assertIn("물리 GPU 2번 · 1개", text)
         self.assertIn("[1/2] 로컬 컴퓨터에서 새 터미널 탭", text)
         self.assertIn(tunnel, text)
-        self.assertIn("OTP와 비밀번호를 입력하면 '[KSC2026] 정상 접속되었습니다.'", text)
+        self.assertIn("OTP와 비밀번호를 입력하면 'KSC2026 터널에 정상 접속되었습니다.'", text)
         self.assertIn("터널을 유지하므로 프롬프트가 돌아오지 않습니다", text)
         self.assertNotIn("영문 대문자 L", text)
         self.assertNotIn("아무 출력 없이", text)
