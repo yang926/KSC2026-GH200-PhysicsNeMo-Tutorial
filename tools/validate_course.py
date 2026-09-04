@@ -150,6 +150,28 @@ KOREAN_COPY_FORBIDDEN = (
     "README와 `02`의 초록색 그림",
 )
 
+FREE_FORM_RESPONSE_NAMES = (
+    "BUILD_PREDICTION",
+    "RUN_PREDICTION",
+    "CPU_OBSERVATION",
+    "MEMORY_PREDICTION",
+    "BANDWIDTH_PREDICTION",
+    "GPU_OBSERVATION",
+    "HYPOTHESIS",
+    "EXPERIMENT_NOTE",
+    "ERROR_OBSERVATION",
+    "FIELD_OBSERVATION",
+    "ERROR_HYPOTHESIS",
+    "COST_HYPOTHESIS",
+    "CONCLUSION",
+)
+
+FREE_FORM_RESPONSE_PHRASES = (
+    "적으세요",
+    "작성하세요",
+    "기록할 내용",
+)
+
 
 class Validation:
     def __init__(self) -> None:
@@ -212,6 +234,7 @@ def check_course_scope(check: Validation) -> None:
 
 def check_notebooks(check: Validation) -> None:
     ids: set[str] = set()
+    free_form_responses: list[str] = []
     for path in ACTIVE_NOTEBOOKS:
         if not path.is_file():
             continue
@@ -224,6 +247,12 @@ def check_notebooks(check: Validation) -> None:
             if not isinstance(cell, dict):
                 check.errors.append(f"{path.relative_to(ROOT)} cell {index} is not an object")
                 continue
+            cell_source = source_text(cell)
+            for phrase in FREE_FORM_RESPONSE_PHRASES:
+                if phrase in cell_source:
+                    free_form_responses.append(
+                        f"{path.relative_to(ROOT)} cell {index}: {phrase}"
+                    )
             cell_id = str(cell.get("id", ""))
             if not cell_id:
                 check.errors.append(f"{path.relative_to(ROOT)} cell {index} has no id")
@@ -233,6 +262,11 @@ def check_notebooks(check: Validation) -> None:
                 ids.add(cell_id)
             if cell.get("cell_type") == "code":
                 code_for_compile = notebook_python_source(cell)
+                for name in FREE_FORM_RESPONSE_NAMES:
+                    if re.search(rf"(?m)^\s*{re.escape(name)}\s*=", code_for_compile):
+                        free_form_responses.append(
+                            f"{path.relative_to(ROOT)} cell {index}: {name}"
+                        )
                 try:
                     compile(code_for_compile, f"{path.name}:cell-{index}", "exec")
                 except SyntaxError as error:
@@ -244,6 +278,12 @@ def check_notebooks(check: Validation) -> None:
     check.require(
         not any("code cell" in item for item in check.errors),
         "notebook Python and the approved nvidia-smi shell cell parse, and outputs are cleared",
+    )
+    check.require(
+        not free_form_responses,
+        "participant notebooks contain no free-form answer placeholders"
+        if not free_form_responses
+        else "free-form answer placeholders remain: " + "; ".join(free_form_responses),
     )
 
 
@@ -1180,6 +1220,32 @@ def check_cuda13_prefetch(check: Validation) -> None:
     )
 
 
+def check_gpu_notebook_summary(check: Validation) -> None:
+    notebook_path = ROOT / "01_GH200/02_GPU_Memory_Profile.ipynb"
+    notebook = load_notebook(notebook_path) if notebook_path.is_file() else {"cells": []}
+    cells = {
+        str(cell.get("id", "")): source_text(cell)
+        for cell in notebook.get("cells", [])
+        if isinstance(cell, dict)
+    }
+    profile_settings = cells.get("gh200-gpu-profile-settings", "")
+    summary = cells.get("gh200-gpu-observation-code", "")
+    required_markers = (
+        'if "system" in PROFILE_TARGETS and not SYSTEM_MEMORY_SUPPORTED:',
+        "program_coverage_ready = set(program_status) == set(PROGRAM_COMMANDS)",
+        'program_status.get(name) == "PASS"',
+        "program_coverage_ready\n    and required_programs_ready",
+    )
+    combined = profile_settings + "\n" + summary
+    missing = [marker for marker in required_markers if marker not in combined]
+    check.require(
+        not missing,
+        "GPU notebook rejects unsupported profile targets and requires complete program coverage"
+        if not missing
+        else f"GPU notebook automatic-summary guards are incomplete: {missing}",
+    )
+
+
 def check_docker_context(check: Validation) -> None:
     ignore_path = ROOT / ".dockerignore"
     if not ignore_path.is_file():
@@ -1321,6 +1387,7 @@ def main(argv=None) -> int:
     check_participant_payload_closure(check)
     check_spdx(check)
     check_cuda13_prefetch(check)
+    check_gpu_notebook_summary(check)
     check_docker_context(check)
     check_github_operations_suites(check)
     return check.finish()
