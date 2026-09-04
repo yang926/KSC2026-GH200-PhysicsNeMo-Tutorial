@@ -155,6 +155,28 @@ def table_gpu(payload: dict[str, Any] | None) -> str:
         ):
             value = bandwidth.get(key)
             rows.append((f"`{key}`", f"{value} GB/s" if value else BLANK))
+        over = payload.get("oversubscription") or {}
+        if over.get("ready"):
+            hbm_free = over.get("hbm_free_bytes") or 1
+            rows.append((
+                "HBM 초과 요청 크기",
+                f"{over['total_bytes'] / 2**30:.1f} GiB "
+                f"(HBM 여유의 {over['total_bytes'] / hbm_free:.2f}배)",
+            ))
+            for name, record in (over.get("results") or {}).items():
+                text = record.get("output", "")
+                mark = next(
+                    (m.split("=")[1] for m in
+                     ("result=PASS", "result=OOM", "result=HOST_OOM")
+                     if m in text),
+                    BLANK,
+                )
+                rows.append((
+                    f"HBM 초과 — `{name}`",
+                    f"{mark}, {record.get('seconds', 0):.1f} 초",
+                ))
+        else:
+            rows.append(("HBM 초과 실습", "SKIP (시스템 메모리 여유 부족)"))
         rows.append(("이 노트북 전체 실행 시간", "(직접 기입) 분"))
     else:
         rows = [("work/gh200/gpu_results_*.json 없음 — 01-2 노트북 실행 필요", BLANK)]
@@ -240,6 +262,20 @@ def table_fno(payload: dict[str, Any] | None) -> str:
                 f"modes {payload.get('fno_modes')}",
             ),
         ]
+        unified = payload.get("unified_memory_demo") or {}
+        if unified:
+            for name in ("default", "managed"):
+                record = unified.get(name)
+                if not record:
+                    continue
+                detail = record.get("status", BLANK)
+                if record.get("status") == "PASS":
+                    detail += (f", 할당 {record.get('allocate_seconds', 0):.1f}s"
+                               f" / 연산 {record.get('compute_seconds', 0):.1f}s")
+                rows.append((f"HBM 초과 텐서 — `{name}` 할당기", detail))
+        else:
+            rows.append(("HBM 초과 텐서 데모 (12절)", "실행 안 됨"))
+
         total = dataset_min + train_min
         margin = 80 - total
         mark = "OK" if margin >= 20 else ("빠듯함" if margin >= 0 else "초과")
