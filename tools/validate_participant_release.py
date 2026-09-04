@@ -23,7 +23,6 @@ EXPECTED_CAPABILITIES = {
 }
 EXPECTED_PATHS = [
     "README.md",
-    "AFTER_EVENT.md",
     "00_Start_Here.ipynb",
     "01_GH200",
     "02_PhysicsNeMo",

@@ -100,7 +100,7 @@ SIF는 읽기 전용 실행 환경이고, 참가자가 수정하는 노트북과
 
 ## 행사 후 개인 환경
 
-행사 당일에는 필요 없습니다. 개인 환경 설치, 25.11 API 그대로 재현하기, 최신 v2.0으로 옮기기는 [행사 후 안내](../AFTER_EVENT.md)에 정리했습니다.
+행사 당일에는 필요 없습니다. 개인 환경 설치, 25.11 API 그대로 재현하기, 최신 v2.0으로 옮기기는 [행사 후 안내](https://github.com/yang926/KSC2026-GH200-PhysicsNeMo-Tutorial/blob/main/AFTER_EVENT.md)에 정리했습니다.
 
 ## 실습별 생성 파일
 
@@ -156,6 +156,6 @@ SIF는 읽기 전용 실행 환경이고, 참가자가 수정하는 노트북과
 - [PhysicsNeMo 25.11 문서](https://docs.nvidia.com/physicsnemo/25.11/) — 이 과정의 기준 문서
 - [FNO 논문](https://arxiv.org/abs/2010.08895) · [PINN 논문](https://www.sciencedirect.com/science/article/pii/S0021999118307125)
 - [OpenHackathons AI-Powered-Physics-Bootcamp 원본 과정](https://github.com/openhackathons-org/AI-Powered-Physics-Bootcamp)
-- 설치·마이그레이션 안내는 [행사 후 안내](../AFTER_EVENT.md)에 있습니다.
+- 설치·마이그레이션 안내는 [행사 후 안내](https://github.com/yang926/KSC2026-GH200-PhysicsNeMo-Tutorial/blob/main/AFTER_EVENT.md)에 있습니다.
 
 [Start Here로 돌아가기](../00_Start_Here.ipynb) · [전체 과정 안내 보기](../README.md)

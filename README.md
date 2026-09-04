@@ -172,7 +172,7 @@ import physicsnemo.sym
 
 ### 행사 후 개인 환경에서 사용하려면
 
-행사 당일에는 필요 없는 내용입니다. 집·연구실 환경에 PhysicsNeMo를 설치하는 방법, 이 실습 코드를 25.11 API 그대로 재현하는 방법, 최신 v2.0으로 옮기는 방법은 [**행사 후 안내**](AFTER_EVENT.md)에 따로 정리했습니다.
+행사 당일에는 필요 없는 내용입니다. 집·연구실 환경에 PhysicsNeMo를 설치하는 방법, 이 실습 코드를 25.11 API 그대로 재현하는 방법, 최신 v2.0으로 옮기는 방법은 [**행사 후 안내**](https://github.com/yang926/KSC2026-GH200-PhysicsNeMo-Tutorial/blob/main/AFTER_EVENT.md)에 따로 정리했습니다. 행사장 계산 노드는 오프라인이므로 행사가 끝난 뒤 여세요.
 
 ### 검증된 이미지 구성
 
@@ -204,7 +204,6 @@ import physicsnemo.sym
 ```text
 .
 ├── README.md
-├── AFTER_EVENT.md          # 행사 후 개인 환경 안내
 ├── 00_Start_Here.ipynb
 ├── 01_GH200/
 │   ├── README.md
