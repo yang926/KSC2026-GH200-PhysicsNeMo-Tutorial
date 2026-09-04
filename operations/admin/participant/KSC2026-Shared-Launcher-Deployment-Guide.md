@@ -254,7 +254,7 @@ sha256sum --check --strict "${KSC_SIF}.sha256"
 
 다음 항목을 실제로 검증합니다.
 
-- `00_Start_Here.ipynb`가 열림
+- `README.md`가 렌더링된 첫 화면으로 열리고 상단 링크에서 `00_Start_Here.ipynb`가 열림
 - PyTorch에서 GPU가 정확히 한 개 보임
 - 파일이 `/scratch/<계정>/ksc2026/workspaces/`에 저장됨
 - 터널만 끊은 뒤 공용 명령을 다시 실행하면 같은 Job으로 돌아감

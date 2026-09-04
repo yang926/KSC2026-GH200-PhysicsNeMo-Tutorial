@@ -227,7 +227,7 @@ sha256sum --check --strict "${KSC_SIF}.sha256"
 
 새 로컬 터미널 탭에서 출력된 SSH 명령을 그대로 실행합니다. 인증 뒤 아무 메시지 없이 터널이 유지되는 것이 정상입니다. 브라우저에서 URL을 열고 다음을 확인합니다.
 
-- `00_Start_Here.ipynb`가 열림
+- `README.md`가 렌더링된 첫 화면으로 열리고 상단 링크에서 `00_Start_Here.ipynb`가 열림
 - PyTorch에서 GH200이 정확히 한 개 보임
 - CUDA 텐서 연산이 통과
 - 파일 저장과 60초 자동 저장

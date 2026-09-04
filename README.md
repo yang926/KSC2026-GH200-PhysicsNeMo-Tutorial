@@ -4,15 +4,15 @@
 
 <p align="center">한국어 과정 · 참가자 1명당 GH200 1대 · 계산 노드 오프라인 실행</p>
 
-<h2 align="center"><a href="#행사-당일-jupyterlab-접속">행사 당일 접속 안내부터 시작하기 →</a></h2>
+<h2 align="center"><a href="00_Start_Here.ipynb">00 Start Here — 환경 점검 시작 →</a></h2>
 
-<p align="center">JupyterLab에 접속했다면 <a href="00_Start_Here.ipynb">00 Start Here — 환경 점검</a>부터 실행하세요.</p>
+<p align="center"><a href="#행사-당일-jupyterlab-접속">접속·재접속 안내</a> · <a href="#과정-개요">전체 과정 구성</a></p>
 
 <p align="center"><a href="01_GH200/README.md">01 GH200 모듈 지도</a> · <a href="02_PhysicsNeMo/README.md">02 PhysicsNeMo 모듈 지도</a></p>
 
 ---
 
-이 문서는 과정 전체의 개념·실습 순서·완료 기준을 설명하는 안내서입니다. JupyterLab에서 바로 실행할 첫 단계는 [`00_Start_Here.ipynb`](00_Start_Here.ipynb)에 모아 두었습니다.
+이 문서는 JupyterLab에 접속하면 가장 먼저 열리는 과정 안내서입니다. 전체 개념·실습 순서·완료 기준을 확인한 뒤 상단의 **00 Start Here — 환경 점검 시작**을 눌러 실행 환경을 점검합니다.
 
 ## 행사 당일 JupyterLab 접속
 
@@ -27,7 +27,7 @@
 
 3. `KSC 2026 JupyterLab 준비 완료`가 표시되면 배정된 계산 노드와 GH200 한 개를 확인합니다.
 4. **로컬 터미널 2**를 새로 열고, 화면의 `[1/2]` 아래에 표시된 `ssh -N ...` 한 줄을 통째로 붙여 넣습니다. OTP와 비밀번호를 입력한 뒤 화면이 멈춰 있으면 정상입니다. 이 터미널은 실습 중 열어 둡니다.
-5. 화면의 `[2/2]` 아래에 표시된 주소를 웹 브라우저에서 엽니다. 주소에 포함된 개인 접속 토큰은 다른 사람과 공유하지 않습니다.
+5. 화면의 `[2/2]` 아래에 표시된 주소를 웹 브라우저에서 엽니다. 이 README 안내서가 렌더링된 첫 화면으로 열립니다. 상단의 **00 Start Here — 환경 점검 시작**을 누릅니다. 주소에 포함된 개인 접속 토큰은 다른 사람과 공유하지 않습니다.
 
 ### 저장과 재접속
 

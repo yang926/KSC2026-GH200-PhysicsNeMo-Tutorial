@@ -148,6 +148,8 @@ class UnifiedSessionControllerTests(unittest.TestCase):
             )
         exported = next(value for value in command if value.startswith("--export="))
         self.assertIn("KSC_EXPECTED_GPU_COUNT=1", exported)
+        self.assertIn("KSC_ENTRY_NOTEBOOK=00_Start_Here.ipynb", exported)
+        self.assertIn("KSC_LANDING_PAGE=README.md", exported)
         self.assertIn("KSC_LOG_DIR=", exported)
         self.assertNotIn("--export=ALL", exported)
 
@@ -264,7 +266,7 @@ class UnifiedSessionControllerTests(unittest.TestCase):
             "127.0.0.1:8888:compute017:18882 edu001@pilot.example.test"
         )
         url = (
-            "http://127.0.0.1:8888/lab/tree/00_Start_Here.ipynb?token="
+            "http://127.0.0.1:8888/lab/tree/README.md?token="
             + "c" * 48
         )
         self.assertIn("계산 노드   : compute017", text)
@@ -342,6 +344,8 @@ class UnifiedSessionControllerTests(unittest.TestCase):
             '"$SLURM_JOB_ID" "$compute_node" "$remote_port" "$slurm_job_gpus"',
             '"gpu_index":%s',
             '"course_commit":"%s"',
+            '"defaultViewers":{"markdown":"Markdown Preview"}',
+            "c.ServerApp.default_url = '/lab/tree/$KSC_LANDING_PAGE'",
         ):
             self.assertIn(marker, script)
         for forbidden in (

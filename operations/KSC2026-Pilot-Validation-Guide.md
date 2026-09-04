@@ -74,7 +74,7 @@ JupyterLab이 준비되면 화면에 다음 정보가 한 번씩 명확하게 �
 ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 127.0.0.1:8888:<계산노드>:<원격포트> <계정>@<PILOT_LOGIN_HOST>
 
 [2/2] 웹 브라우저에서 아래 주소를 여세요.
-http://127.0.0.1:8888/lab/tree/00_Start_Here.ipynb?token=<개인 token>
+http://127.0.0.1:8888/lab/tree/README.md?token=<개인 token>
 ```
 
 사용자가 노드, 포트 또는 호스트를 직접 고치게 해서는 안 됩니다. `-L`은 영문 대문자 L입니다.
@@ -99,7 +99,8 @@ PILOT 터미널에 표시된 개인 접속 token이 포함된 주소를 웹 브�
 합격 기준:
 
 - JupyterLab이 로그인 화면 없이 열림
-- `00_Start_Here.ipynb`가 바로 열림
+- `README.md`가 편집기가 아닌 렌더링된 Markdown 안내서로 바로 열림
+- README 상단의 **00 Start Here — 환경 점검 시작** 링크가 `00_Start_Here.ipynb`를 엶
 - 파일 브라우저에 `README.md`, `01_GH200/`, `02_PhysicsNeMo/`, `labs/`가 보임
 - 브라우저 주소는 `127.0.0.1:8888`을 사용함
 

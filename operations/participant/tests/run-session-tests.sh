@@ -24,6 +24,8 @@ grep -F -- '--gres=gpu:' "$root/session-controller.py" >/dev/null
 grep -F -- '"--time=1-00:00:00"' "$root/session-controller.py" >/dev/null
 grep -F -- 'c.ServerApp.ip = '\''0.0.0.0'\''' "$root/jupyter-job.sh" >/dev/null
 grep -F -- 'autosaveInterval":60' "$root/jupyter-job.sh" >/dev/null
+grep -F -- '"defaultViewers":{"markdown":"Markdown Preview"}' "$root/jupyter-job.sh" >/dev/null
+grep -F -- "c.ServerApp.default_url = '/lab/tree/\$KSC_LANDING_PAGE'" "$root/jupyter-job.sh" >/dev/null
 grep -F -- 'SLURM_JOB_GPUS' "$root/jupyter-job.sh" >/dev/null
 grep -F -- '"gpu_index":%s' "$root/jupyter-job.sh" >/dev/null
 grep -F -- 'remote_port=$((18880 + 10#$slurm_job_gpus))' "$root/jupyter-job.sh" >/dev/null

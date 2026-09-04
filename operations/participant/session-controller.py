@@ -41,6 +41,7 @@ JOB_RE = re.compile(r"^[1-9][0-9]*$")
 HEX40_RE = re.compile(r"^[0-9a-f]{40}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 COURSE_ENTRY = "00_Start_Here.ipynb"
+COURSE_LANDING = "README.md"
 SHARED_COMMAND = "/scratch/hackathon/ksc2026/bin/ksc2026"
 LOCAL_JUPYTER_PORT = 8888
 ALLOWED_PERSONAL_SCRATCH_MODES = {0o700, 0o750, 0o755}
@@ -444,6 +445,8 @@ def read_course(config: dict[str, str], cfg_path: Path, username: str) -> Course
         raise SessionError("중앙 강의자료가 설치된 고정 SIF와 호환되지 않습니다")
     if not (source / COURSE_ENTRY).is_file():
         raise SessionError(f"중앙 강의자료에 {COURSE_ENTRY}가 없습니다")
+    if not (source / COURSE_LANDING).is_file():
+        raise SessionError(f"중앙 강의자료에 {COURSE_LANDING}가 없습니다")
     verify_payload(source)
     return Course(source=source, commit=commit, runtime_compatibility=runtime, sif_sha256=sif_sha)
 
@@ -876,6 +879,7 @@ def build_sbatch(
         "KSC_COURSE_COMMIT": course.commit,
         "KSC_RUNTIME_COMPATIBILITY": course.runtime_compatibility,
         "KSC_ENTRY_NOTEBOOK": COURSE_ENTRY,
+        "KSC_LANDING_PAGE": COURSE_LANDING,
         "KSC_JOB_READY_TIMEOUT": config.get("KSC_READY_TIMEOUT", "900"),
     }
     if any("," in value or "\n" in value for value in exports.values()):
@@ -982,7 +986,7 @@ def emit_session(
         ]
     )
     url = (
-        f"http://127.0.0.1:{LOCAL_JUPYTER_PORT}/lab/tree/{COURSE_ENTRY}"
+        f"http://127.0.0.1:{LOCAL_JUPYTER_PORT}/lab/tree/{COURSE_LANDING}"
         f"?token={urllib.parse.quote(token, safe='')}"
     )
 

@@ -108,7 +108,7 @@ GitHub push만으로는 중앙 게시본이 바뀌지 않습니다. 위 명령�
 2. 공용 `ksc2026` 실행
 3. Slurm 동적 계산 노드·GH200 한 개 배정 확인
 4. 화면의 완성된 `ssh -N -L`을 새 로컬 터미널에서 실행
-5. token 인증 JupyterLab과 `00_Start_Here.ipynb` 확인
+5. token 인증 JupyterLab에서 렌더링된 `README.md` 첫 화면과 `00_Start_Here.ipynb` 링크 확인
 6. 파일 저장
 7. 터널 단절 뒤 같은 Job·작업공간 재접속
 8. `--stop` 뒤 저장 파일과 중앙 SIF 불변 확인

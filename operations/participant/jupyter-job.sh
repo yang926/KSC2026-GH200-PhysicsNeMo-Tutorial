@@ -7,7 +7,7 @@ umask 077
 
 for name in SLURM_JOB_ID KSC_STATE_DIR KSC_WORK_DIR KSC_LOG_DIR KSC_IMAGE KSC_IMAGE_SHA256 \
     KSC_EXPECTED_GPU_COUNT KSC_APPTAINER \
-    KSC_COURSE_COMMIT KSC_RUNTIME_COMPATIBILITY KSC_ENTRY_NOTEBOOK; do
+    KSC_COURSE_COMMIT KSC_RUNTIME_COMPATIBILITY KSC_ENTRY_NOTEBOOK KSC_LANDING_PAGE; do
     [[ -n "${!name:-}" ]] || { printf 'KSC2026 compute 오류: %s 값이 없습니다.\n' "$name" >&2; exit 120; }
 done
 
@@ -22,6 +22,8 @@ done
 [[ -f "$KSC_IMAGE" && ! -L "$KSC_IMAGE" && -r "$KSC_IMAGE" ]] || exit 123
 [[ -x "$KSC_APPTAINER" && ! -L "$KSC_APPTAINER" ]] || exit 123
 [[ -f "$KSC_WORK_DIR/$KSC_ENTRY_NOTEBOOK" && ! -L "$KSC_WORK_DIR/$KSC_ENTRY_NOTEBOOK" ]] || exit 123
+[[ -f "$KSC_WORK_DIR/$KSC_LANDING_PAGE" && ! -L "$KSC_WORK_DIR/$KSC_LANDING_PAGE" ]] || exit 123
+[[ "$KSC_LANDING_PAGE" == "README.md" ]] || exit 123
 compute_node="$(hostname -s)"
 [[ "$compute_node" =~ ^gpu[0-9]{4}$ ]] || {
     printf 'KSC2026 compute 오류: 계산 노드 이름을 안전하게 확인할 수 없습니다: %s\n' "$compute_node" >&2
@@ -143,7 +145,7 @@ token="$(python3 -c 'import secrets; print(secrets.token_hex(24))')"
 [[ "$token" =~ ^[0-9a-f]{48}$ ]] || exit 127
 printf '%s\n' "$token" >"$token_file"
 chmod 600 "$token_file"
-printf '%s\n' '{"autosave":true,"autosaveInterval":60}' >"$settings"
+printf '%s\n' '{"autosave":true,"autosaveInterval":60,"defaultViewers":{"markdown":"Markdown Preview"}}' >"$settings"
 chmod 600 "$settings"
 cat >"$server_config" <<EOF
 c = get_config()
@@ -151,7 +153,7 @@ c.ServerApp.ip = '0.0.0.0'
 c.ServerApp.port = $remote_port
 c.ServerApp.port_retries = 0
 c.ServerApp.root_dir = '/workspace'
-c.ServerApp.default_url = '/lab/tree/$KSC_ENTRY_NOTEBOOK'
+c.ServerApp.default_url = '/lab/tree/$KSC_LANDING_PAGE'
 c.ServerApp.open_browser = False
 c.ServerApp.allow_remote_access = True
 c.IdentityProvider.token = '$token'
