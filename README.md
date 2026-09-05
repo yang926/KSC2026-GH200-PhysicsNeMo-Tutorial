@@ -247,3 +247,9 @@ PhysicsNeMo 과정은 공개 [OpenHackathons AI-Powered-Physics-Bootcamp](https:
 행사 공용 `/scratch/hackathon/ksc2026/bin/ksc2026` 배포 순서는 [온라인 공용 런처 배포 매뉴얼](https://github.com/yang926/KSC2026-GH200-PhysicsNeMo-Tutorial/blob/main/operations/admin/participant/KSC2026-Shared-Launcher-Deployment-Guide.md)을 사용합니다. 중앙 owner는 `sudo` 없이 운영하며, 기존 배포의 갱신·복구는 [상세 운영 매뉴얼](https://github.com/yang926/KSC2026-GH200-PhysicsNeMo-Tutorial/blob/main/operations/admin/participant/KSC2026-Admin-Deployment-Guide.md)을 따릅니다.
 
 강의자료만 바뀌었다면 GitHub `main`에 push한 뒤 PILOT 로그인 노드에서 중앙 owner가 `/scratch/hackathon/ksc2026/admin/bin/refresh-course`를 한 번 실행합니다. GitHub push만으로 중앙 게시본이 자동 변경되지는 않습니다.
+
+## 사후 설문조사
+
+KSC2026 튜토리얼을 마친 뒤 사후 설문에 참여해 주세요. 응답은 국가슈퍼컴퓨터 6호기의 원활한 교육 운영과 향후 프로그램 개선에 활용됩니다.
+
+**[KSC2026 튜토리얼 사후 설문조사 참여하기](https://forms.gle/8YDsUDR6ZnWaZTA29)**
