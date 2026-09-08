@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Central-owner entry point for publishing the latest validated course release.
+
+set -Eeuo pipefail
+set -f
+umask 077
+export LC_ALL=C
+
+central_root=/scratch/hackathon/ksc2026
+publisher="$central_root/admin/libexec/publish-course.sh"
+
+case "${1:-}" in
+    "") ;;
+    -h|--help)
+        cat <<'EOF'
+사용법: /scratch/hackathon/ksc2026/admin/bin/refresh-course
+
+GitHub main의 최신 강의자료를 검증해 중앙의 새 immutable release로
+게시합니다. SIF, 공용 Jupyter 런타임, 활성 Job과 개인 작업공간은
+변경하지 않습니다.
+EOF
+        exit 0
+        ;;
+    *)
+        printf 'KSC_REFRESH_ERROR=NO_OPTIONS_ALLOWED\n' >&2
+        exit 2
+        ;;
+esac
+
+[[ -x "$publisher" && -f "$publisher" && ! -L "$publisher" ]] || {
+    printf 'KSC_REFRESH_ERROR=TRUSTED_PUBLISHER_NOT_INSTALLED\n' >&2
+    exit 1
+}
+
+exec "$publisher" \
+    --root "$central_root" \
+    --site-env "$central_root/config/site.env" \
+    --ref main

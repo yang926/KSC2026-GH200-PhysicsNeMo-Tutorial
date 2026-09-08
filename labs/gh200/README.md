@@ -1,0 +1,24 @@
+# GH200 실습 지원 파일
+
+이 폴더에는 [Grace CPU 컴파일·튜닝](../../01_GH200/01_CPU_Compile_and_Tune.ipynb)과 [Hopper GPU 메모리·프로파일링](../../01_GH200/02_GPU_Memory_Profile.ipynb) 노트북이 호출하는 소스 코드와 도우미 함수가 있습니다.
+
+| 경로 | 역할 | 생성 결과 |
+|---|---|---|
+| `notebook_utils.py` | 명령 실행, 도구 확인, 이미지 구성 정보 읽기 | 노트북 출력 |
+| `blas/dgemm.c` | 같은 DGEMM 호출로 행렬 곱셈 수행 | 체크섬, 실행 시간, GFLOP/s |
+| `blas/Makefile` | OpenBLAS·NVPL의 고정 빌드 구성과 `GCC_FLAGS`·`NVC_FLAGS` 정의 | `work/gh200/bin/dgemm-*` |
+| `cuda_memory/explicit.cu` | 명시적 호스트↔디바이스 할당·복사, 명령행 데이터 크기 적용 | `cuda-explicit <원소 수>` |
+| `cuda_memory/managed.cu` | `cudaMallocManaged`의 요구 시 접근·사전 이동 비교 | `cuda-managed <원소 수> demand\|prefetch` |
+| `cuda_memory/hmm.cu` | 시스템 할당 메모리의 GPU 직접 접근 여부와 ATS·HMM 경로 확인 | `cuda-system <원소 수>` 또는 `SKIP` |
+| `pytorch_unified/managed_alloc.cu` | PyTorch 할당기를 `cudaMallocManaged`로 바꾸는 최소 공유 라이브러리 | `managed_alloc.so` |
+| `pytorch_unified/oversubscribe_torch.py` | HBM보다 큰 텐서를 기본 할당기와 통합 메모리 할당기로 각각 시도 | `KSC_RESULT=` JSON 한 줄 |
+
+세 CUDA 예제는 명령행 인수로 배열 크기를 받습니다. 상한을 HBM보다 크게 열어 두었지만, **안전한 크기는 노트북이 실행 시점의 HBM 여유와 시스템 메모리 여유에서 계산해 전달합니다.** 한 노드를 여러 참가자가 함께 쓸 수 있으므로 값을 직접 키우지 마세요.
+
+`pytorch_unified/`는 [Poisson FNO 노트북](../../02_PhysicsNeMo/02_Poisson_FNO.ipynb) 12절에서 호출합니다. PyTorch의 할당기는 CUDA를 처음 쓰기 전에만 바꿀 수 있으므로 노트북 안이 아니라 별도 프로세스로 실행합니다.
+
+컴파일러, 수학 라이브러리, 프로파일러와 nvbandwidth는 SIF에 설치되어 있습니다. 노트북에서 행렬 크기·스레드 수·CUDA 실행 인수·프로파일 대상을 바꿀 수 있지만 계산 노드에서 패키지를 설치하거나 소스를 내려받지는 않습니다. 실행 파일과 프로파일 보고서는 개인 작업공간의 `work/gh200/` 아래에만 생성됩니다.
+
+이 예제는 KSC 2026 실습용으로 작성했으며 각 소스 파일에 Apache-2.0 SPDX 식별자를 기록합니다.
+
+[01_GH200 모듈 안내로 돌아가기](../../01_GH200/README.md)

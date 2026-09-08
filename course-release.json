@@ -1,0 +1,68 @@
+{
+  "schema_version": 2,
+  "repository": "https://github.com/yang926/KSC2026-GH200-PhysicsNeMo-Tutorial",
+  "default_ref": "main",
+  "runtime_compatibility": "ksc2026-gh200-physicsnemo-25.11-arm64-v1",
+  "compatible_sif_sha256": [
+    "ee43b2c0735b26a7168e53c7e598dd5dc527b1e23284682f790430656d8bdacf"
+  ],
+  "participant_entry": "00_Start_Here.ipynb",
+  "required_runtime": {
+    "image": "ksc2026-gh200-physicsnemo_25.11-arm64.sif",
+    "platform": "linux/arm64",
+    "components": {
+      "physicsnemo": "25.11",
+      "nvhpc": "25.5",
+      "nvpl": "25.5",
+      "openblas": "0.3.31",
+      "nvbandwidth": "0.8",
+      "boost_program_options": "1.83.0",
+      "cuda_compiler": "13.0",
+      "nsight_systems": "2025.5.1"
+    },
+    "commands": [
+      "python3",
+      "jupyter",
+      "nvcc",
+      "nsys",
+      "nvc",
+      "gcc",
+      "make",
+      "nvbandwidth"
+    ],
+    "python_imports": [
+      "torch",
+      "physicsnemo",
+      "physicsnemo.sym",
+      "numpy",
+      "h5py",
+      "hydra",
+      "yaml",
+      "matplotlib",
+      "IPython"
+    ],
+    "capabilities": [
+      "arm64",
+      "gh200-sm90",
+      "cuda-13-forward-compat-r570-or-newer",
+      "ssh-tunneled-jupyter",
+      "offline-runtime"
+    ]
+  },
+  "delivery": {
+    "image_role": "immutable runtime",
+    "course_role": "operator-published immutable Git commit",
+    "compute_node_network_required": false,
+    "workspace_role": "per-account writable copy seeded atomically from the read-only release"
+  },
+  "participant_paths": [
+    "README.md",
+    "00_Start_Here.ipynb",
+    "01_GH200",
+    "02_PhysicsNeMo",
+    "labs",
+    "LICENSE",
+    "PROVENANCE.md",
+    "course-release.json"
+  ]
+}

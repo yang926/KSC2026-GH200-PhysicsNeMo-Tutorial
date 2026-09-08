@@ -1,0 +1,5 @@
+/config/site.env
+/config/known_hosts
+/known_hosts
+/participant-bundles/
+*.zip

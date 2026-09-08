@@ -1,0 +1,19 @@
+.ipynb_checkpoints
+__pycache__
+.Trash_0
+.cursor/
+
+# KSC hands-on outputs (generated locally on each participant's GH200)
+labs/poisson_fno/datasets/Poisson_Fourier_GH200/
+labs/poisson_fno/datasets/Poisson_Fourier_Recovery/
+labs/poisson_fno/outputs/
+labs/projectile/outputs/
+labs/projectile/prediction.png
+
+# Local container artifacts
+dist/
+*.sif
+*.sqsh
+*.tar
+*.tar.gz
+*.sha256

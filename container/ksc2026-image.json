@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "image": "ksc2026-gh200-physicsnemo:25.11-arm64",
+  "platform": "linux/arm64",
+  "base": {
+    "name": "nvcr.io/nvidia/physicsnemo/physicsnemo",
+    "tag": "25.11",
+    "arm64_manifest_digest": "sha256:4e7f82e33d886828efd1e4d65236f5e44c96dfbd3d316c58723eff9b9298eda6"
+  },
+  "components": {
+    "physicsnemo": "25.11",
+    "nvhpc": "25.5",
+    "nvpl": "25.5",
+    "boost_program_options": "1.83.0 (statically linked into nvbandwidth)",
+    "openblas": "0.3.31",
+    "nvbandwidth": "0.8",
+    "cuda_compiler": "13.0 (provided by PhysicsNeMo 25.11 base)",
+    "nsight_systems": "2025.5.1 (provided by PhysicsNeMo 25.11 base)",
+    "jupyterlab": "provided by PhysicsNeMo 25.11 base"
+  },
+  "course_source": "/opt/ksc2026/course-source",
+  "participant_workdir_default": "$HOME/ksc2026-course",
+  "runtime_network_required": false,
+  "private_gh200_repository_material_included": false,
+  "runtime_compatibility": "ksc2026-gh200-physicsnemo-25.11-arm64-v1",
+  "source_repository": "https://github.com/yang926/KSC2026-GH200-PhysicsNeMo-Tutorial",
+  "course_delivery": {
+    "embedded_source": "/opt/ksc2026/course-source",
+    "live_source": "operator-published read-only GitHub release",
+    "live_source_precedence": true,
+    "participant_workspace": "one writable directory per course commit"
+  }
+}

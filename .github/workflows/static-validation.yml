@@ -1,0 +1,56 @@
+name: Static validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  course-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse every shell entry point
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' script; do
+            bash -n "$script"
+          done < <(
+            find operations container -type f \( -name '*.sh' -o -name '*.command' -o -name 'ksc2026-start' -o -name 'start-jupyter' -o -name 'stop-jupyter' -o -name 'preflight-gh200' \) -print0
+          )
+
+      - name: Validate complete source tree
+        run: python3 tools/validate_course.py
+
+      - name: Build and validate the exact participant payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          staging="$(mktemp -d)"
+          cleanup() { rm -rf -- "$staging"; }
+          trap cleanup EXIT
+          python3 - "$staging" <<'PY'
+          import json
+          import shutil
+          import sys
+          from pathlib import Path
+
+          root = Path.cwd()
+          destination = Path(sys.argv[1])
+          manifest = json.loads((root / "course-release.json").read_text(encoding="utf-8"))
+          for relative in manifest["participant_paths"]:
+              source = root / relative
+              target = destination / relative
+              if source.is_dir():
+                  shutil.copytree(source, target)
+              else:
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(source, target)
+          PY
+          python3 tools/validate_participant_release.py "$staging"
